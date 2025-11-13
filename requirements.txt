@@ -5,7 +5,7 @@ uvicorn==0.38.0
 python-jose[cryptography]==3.3.0
 cryptography==41.0.3
 # httpx la thu vien de gui yeu cau HTTP
-# httpx==0.23.0
+httpx==0.23.0
 
 # python-dotenv la thu vien de doc file .env
 python-dotenv==1.0.0
@@ -36,3 +36,5 @@ pydantic_settings
 redis==7.0.1
 
 google-cloud-texttospeech==2.33.0
+
+google-genai
