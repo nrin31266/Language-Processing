@@ -11,7 +11,7 @@ lps-env/
 .idea/
 
 data/
-
+src/temp/
 
 # Result files
 *.json

@@ -1,3 +1,6 @@
+from dotenv import load_dotenv
+load_dotenv()
+
 # main.py
 import logging
 from typing import Optional
@@ -23,7 +26,7 @@ from src.kafka.producer import periodic_flush, producer
 from fastapi.exceptions import HTTPException
 import asyncio
 # cloud
-from src.cloud.config import setup_cloudinary
+from src.s3_storage.config import setup_cloudinary
 # --- 1. Cấu hình logging ---
 logging.basicConfig(
     level=logging.INFO,
@@ -110,10 +113,11 @@ app.add_middleware(
 
 
 # --- 6. Include các Routers ---
-from src.routers import media_router, speech_to_text, redis_router
+from src.routers import media_router, speech_to_text, redis_router, tts_router
 app.include_router(media_router.router)
 app.include_router(speech_to_text.router)
 app.include_router(redis_router.router)
+app.include_router(tts_router.router)
 # app.include_router(blog.router)
 # app.include_router(user.router)
 # app.include_router(auth.router)

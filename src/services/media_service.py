@@ -2,7 +2,7 @@
 from src import dto
 from src.errors.base_exception import BaseException
 from src.errors.base_error_code import BaseErrorCode
-from src.cloud  import cloud_service
+from src.s3_storage  import cloud_service
 import yt_dlp
 import os
 from datetime import datetime
