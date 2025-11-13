@@ -13,7 +13,7 @@ from src.errors.base_exception_handler import (
     http_exception_handler
 )
 from src.errors.base_exception import BaseException
-from src.routers import media_router, speech_to_text
+
 from src.discovery_client.eureka_config import (
     register_with_eureka,
 )  # Đảm bảo import này đúng
@@ -31,6 +31,7 @@ logging.basicConfig(
 )
 import gc
 import torch
+from src.redis.redis_client import redis_client
 # --- 2. Định nghĩa Lifespan (cho Eureka) ---
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -38,7 +39,12 @@ async def lifespan(app: FastAPI):
     
     # --- GỌI CẤU HÌNH CLOUDINARY Ở ĐÂY ---
     setup_cloudinary()
-    
+    print("🔌 Connecting Redis...")
+    try:
+        await redis_client.ping()
+        print("✅ Redis connected")
+    except Exception as e:
+        print("❌ Redis connection failed:", e)
     # await register_with_eureka()
     print("✅ Registered with Eureka")
     # asyncio.create_task(start_kafka_consumers())
@@ -104,8 +110,10 @@ app.add_middleware(
 
 
 # --- 6. Include các Routers ---
+from src.routers import media_router, speech_to_text, redis_router
 app.include_router(media_router.router)
 app.include_router(speech_to_text.router)
+app.include_router(redis_router.router)
 # app.include_router(blog.router)
 # app.include_router(user.router)
 # app.include_router(auth.router)
