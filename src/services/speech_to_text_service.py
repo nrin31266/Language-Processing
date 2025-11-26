@@ -18,14 +18,14 @@ whisper_model = whisperx.load_model(
 print("✨ [WhisperX] Model loaded successfully!")
 
 
-def get_audio_duration(audio_file):
-    if not os.path.exists(audio_file):
-        raise BaseException(BaseErrorCode.NOT_FOUND, f"File not found: {audio_file}")
+def get_audio_duration(path: str) -> float:
+    if not os.path.exists(path):
+        raise BaseException(BaseErrorCode.NOT_FOUND, f"File not found: {path}")
     try:
-        y, sr = librosa.load(audio_file, sr=None)
+        y, sr = librosa.load(path, sr=None)
         return librosa.get_duration(y=y, sr=sr)
     except Exception:
-        raise BaseException(BaseErrorCode.INVALID_AUDIO_FILE, f"Invalid audio file: {audio_file}")
+        raise BaseException(BaseErrorCode.INVALID_AUDIO_FILE, f"Invalid audio file: {path}")
 
 
 

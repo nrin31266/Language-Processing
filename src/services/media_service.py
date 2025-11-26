@@ -170,7 +170,7 @@ def download_audio_file(rq: dto.MediaAudioCreateRequest) -> dto.AudioInfo:
         logger.info(f"Đã tải file audio thành công: {save_path}")
         return dto.AudioInfo(
             file_path=save_path,
-            sourceReferenceId=filename,
+            sourceReferenceId=filename.split('.')[0],
         )
     except requests.exceptions.Timeout:
         logger.error(f"Lỗi Timeout khi tải file: {audio_url}")
@@ -189,12 +189,7 @@ def download_audio_file(rq: dto.MediaAudioCreateRequest) -> dto.AudioInfo:
 # def upload_audio_file(file_path: str, public_id: str):
 #     return cloud_service.upload_file(file_path, public_id, resource_type="video")  # audio được coi như video
 
-def remove_local_file(file_path: str):
-    try:
-        os.remove(file_path)
-        print(f"Đã xóa file tạm thời: {file_path}")
-    except OSError as e:
-        print(f"Lỗi khi xóa file {file_path}: {e.strerror}")
+
 
 # ==========================================================
 # from sqlalchemy.orm import Session

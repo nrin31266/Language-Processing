@@ -20,3 +20,9 @@ def file_exists(path: str) -> bool:
     :return: True nếu tồn tại, False nếu không
     """
     return os.path.isfile(path)
+def remove_local_file(file_path: str):
+    try:
+        os.remove(file_path)
+        print(f"Đã xóa file tạm thời: {file_path}")
+    except OSError as e:
+        print(f"Lỗi khi xóa file {file_path}: {e.strerror}")

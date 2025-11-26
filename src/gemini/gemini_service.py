@@ -1,18 +1,21 @@
-from google import genai
-from google.genai.types import GenerateContentConfig
+import google.generativeai as genai
 from src.gemini.config import config
 
+# Khởi tạo API key
+genai.configure(api_key=config.api_key)
 
-# Tạo client sau khi cấu hình API key
-client = genai.Client(api_key=config.api_key)
+# Model dùng cho NLP 5 câu/batch
+model = genai.GenerativeModel(
+    model_name=config.model,  # ví dụ: "gemini-2.5-flash"
+    generation_config={
+        "temperature": 0,
+        "response_mime_type": "application/json"
+    }
+)
 
-def gemini_generate(prompt: str):
+def gemini_generate(prompt: str) -> str:
     try:
-        response = client.models.generate_content(
-            model=config.model,
-            contents=prompt
-        )
+        response = model.generate_content(prompt)
         return response.text
-
     except Exception as e:
         raise RuntimeError(f"Gemini API Error: {str(e)}")

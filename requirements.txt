@@ -37,4 +37,4 @@ redis==7.0.1
 
 google-cloud-texttospeech==2.33.0
 
-google-genai
+google-generativeai>=0.7.0

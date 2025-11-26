@@ -19,6 +19,7 @@ from src import dto
 from src.services import media_service
 from src.s3_storage import cloud_service
 from src.services import ai_job_service
+from src.services import file_service
 from src.services.lesson_service import lessonParseAiMetaData
 from src.services.file_service import fetch_json_from_url, file_exists
 from src.services import speech_to_text_service
@@ -29,8 +30,8 @@ async def handleLessonGenerationRequested(event: LessonGenerationRequestedEvent)
     """Xử lý khi có yêu cầu tạo bài học."""
     print(f"📥 Nhận LessonGenerationRequestedEvent: {event}")
     try:
-        # Cho 3s cho hệ thống ổn định
-        await asyncio.sleep(3)
+        # Cho 2s cho hệ thống ổn định
+        await asyncio.sleep(2)
         if await ai_job_service.aiJobWasCancelled(event.ai_job_id):
             print(f"⚠️ AI Job {event.ai_job_id} đã bị hủy, dừng xử lý.")
             return
@@ -42,11 +43,11 @@ async def handleLessonGenerationRequested(event: LessonGenerationRequestedEvent)
             print(f"✅ Fetched AI meta data from URL {event.ai_meta_data_url}")
             # print(f"🔍 AI Meta Data: {metadata.model_dump()}")
         except Exception as e:
-            print(f"❌ Failed to fetch AI meta data from URL {event.ai_meta_data_url}: {e}")
             metadata = dto.AiMetadataDto()   # Tạo object rỗng để tránh None
 
         audio_info = None
         uploadUrl = None
+        metadataUploadUrl = event.ai_meta_data_url if event.ai_meta_data_url else None
         if await ai_job_service.aiJobWasCancelled(event.ai_job_id):
             print(f"⚠️ AI Job {event.ai_job_id} đã bị hủy, dừng xử lý.")
             return
@@ -68,24 +69,26 @@ async def handleLessonGenerationRequested(event: LessonGenerationRequestedEvent)
                 )
             else:
                 raise Exception(f"Unsupported LessonSourceType: {event.source_type}")
+            
             if await ai_job_service.aiJobWasCancelled(event.ai_job_id):
                 print(f"⚠️ AI Job {event.ai_job_id} đã bị hủy, dừng xử lý.")
                 return
+            
             uploadUrl = cloud_service.upload_file(
                 audio_info.file_path,
                 public_id= f"lps/lessons/audio/{audio_info.sourceReferenceId}",
                 resource_type= "video" 
             )
+            
             audio_info.audioUrl = uploadUrl
             metadata.sourceFetched = dto.SourceFetchedDto.model_validate(
                 audio_info.model_dump(by_alias=True)
             )
-
+        
             metadataUploadUrl = cloud_service.upload_json_content(
                 json.dumps(metadata.model_dump(by_alias=True)),
                 public_id= f"lps/lessons/{event.lesson_id}/ai-metadata",
             )
-            metadataUploadUrl = metadataUploadUrl
             print(f"✅ Đã tải audio cho Lesson voi {event.ai_job_id}, file tại: {audio_info.file_path}")
         else:
             audio_info = dto.AudioInfo.model_validate(metadata.sourceFetched)
@@ -102,13 +105,17 @@ async def handleLessonGenerationRequested(event: LessonGenerationRequestedEvent)
                         audio_name=audio_info.sourceReferenceId
                     )
                 ).file_path
-        
+    
+        if( metadata.sourceFetched.duration is None):
+            metadata.sourceFetched.duration = int(speech_to_text_service.get_audio_duration(audio_info.file_path))
+            print(f"🔍 Lấy duration cho audio tại {audio_info.file_path}. Duration: {metadata.sourceFetched.duration}")
+
         
         if await ai_job_service.aiJobWasCancelled(event.ai_job_id):
             print(f"⚠️ AI Job {event.ai_job_id} đã bị hủy, dừng xử lý.")
             return
         
-            
+        
             
         await publish_lesson_processing_step_updated(
             LessonProcessingStepUpdatedEvent(
@@ -120,6 +127,8 @@ async def handleLessonGenerationRequested(event: LessonGenerationRequestedEvent)
                 thumbnailUrl=audio_info.thumbnailUrl,
                 isSkip=isSkip,
                 aiMetadataUrl=metadataUploadUrl,
+                # always int 
+                durationSeconds=metadata.sourceFetched.duration if metadata.sourceFetched.duration else 0
             )
         )
         isSkip = False
@@ -133,6 +142,7 @@ async def handleLessonGenerationRequested(event: LessonGenerationRequestedEvent)
             )
         
             metadata.transcribed = dto.TranscribedDto.model_validate(transcription_result)
+            transcription_result = metadata.transcribed
             print(f"✅ Audio transcribed for Lesson with ai_job_id: {event.ai_job_id}")
             # Cập nhật lại metadata lên cloud tra ve cung duong dan cu
             metadataUploadUrl = cloud_service.upload_json_content(
@@ -233,7 +243,20 @@ async def handleLessonGenerationRequested(event: LessonGenerationRequestedEvent)
                 )
             )
         print(f"✅ Đã gửi LessonProcessingStepUpdatedEvent nlpAnalyzed cho Lesson với ai_job_id: {event.ai_job_id}")
-
+        # Cho 2s cho hệ thống ổn định, sau do gui complete
+        await asyncio.sleep(2)
+        if await ai_job_service.aiJobWasCancelled(event.ai_job_id):
+            print(f"⚠️ AI Job {event.ai_job_id} đã bị hủy, dừng xử lý.")
+            return
+        await publish_lesson_processing_step_updated(
+            LessonProcessingStepUpdatedEvent(
+                aiJobId=event.ai_job_id,
+                processingStep=LessonProcessingStep.COMPLETED,
+                aiMessage="Lesson generation completed successfully.",
+                aiMetadataUrl=metadataUploadUrl,
+                isSkip=False
+            )
+        )
     except Exception as e:
         print(f"⚠️ Lỗi khi xử lý LessonGenerationRequestedEvent: {e}")
         await publish_lesson_processing_step_updated(
@@ -243,6 +266,14 @@ async def handleLessonGenerationRequested(event: LessonGenerationRequestedEvent)
                 aiJobId=event.ai_job_id,
             )
         )
+    finally:
+        # Dọn dẹp file local, try except để đảm bảo không lỗi
+        # if audio_info and audio_info.file_path:
+        #     try:
+        #         file_service.remove_local_file(audio_info.file_path)
+        #     except Exception as e:
+        #         print(f"⚠️ Lỗi khi xóa file local: {e}")
+        print(f"🧹 Hoàn tất xử lý LessonGenerationRequestedEvent cho ai_job_id: {event.ai_job_id}")
 
 async def consume_events():
     """

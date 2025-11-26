@@ -22,10 +22,12 @@ class LessonProcessingStepUpdatedEvent(BaseModel):
     thumbnail_url: Optional[str] = Field(None, alias="thumbnailUrl")
     is_skip: Optional[bool] = Field(None, alias="isSkip")
     ai_meta_data_url: Optional[str] = Field(None, alias="aiMetadataUrl")
+    duration_seconds: Optional[int] = Field(None, alias="durationSeconds")
 
     class Config:
         from_attributes = True
         populate_by_name = True
+        validate_assignment = True
 # # public class OrderCancelledEvent {
 # #     private Long orderId;
 # #     private Long userId;
