@@ -2,7 +2,6 @@
 
 import asyncio
 import json
-import os
 from src.kafka.config import create_kafka_consumer
 from src.kafka.event import (
     LessonGenerationRequestedEvent,
@@ -17,51 +16,84 @@ from src.kafka.topic import LESSON_GENERATION_REQUESTED_TOPIC, LESSON_PROCESSING
 import uuid
 from src import dto
 from src.services import media_service
-from src.utils import fileUtils
 from src.s3_storage import cloud_service
 from src.services import ai_job_service
+from src.services.lesson_service import lessonParseAiMetaData
+from src.services.file_service import fetch_json_from_url
 async def handleLessonGenerationRequested(event: LessonGenerationRequestedEvent):
     """Xử lý khi có yêu cầu tạo bài học."""
     print(f"📥 Nhận LessonGenerationRequestedEvent: {event}")
     try:
         # Cho 3s cho hệ thống ổn định
-        await asyncio.sleep(5)
-        if ai_job_service.aiJobWasCancelled(event.ai_job_id):
+        await asyncio.sleep(3)
+        if await ai_job_service.aiJobWasCancelled(event.ai_job_id):
             print(f"⚠️ AI Job {event.ai_job_id} đã bị hủy, dừng xử lý.")
             return
-        # STEP 1: Download audio từ source_url
-        audio_info = None
-        uploadUrl = None
-        if( event.source_type == LessonSourceType.youtube):
-            audio_info =  media_service.download_youtube_audio(
-                dto.MediaAudioCreateRequest(
-                    input_url=event.source_url
+        isSkip = False
+        metadata : dto.AiMetadataDto = None
+        try:
+            fileMetadata = await fetch_json_from_url(event.ai_meta_data_url)
+            metadata = lessonParseAiMetaData(fileMetadata)
+            print(f"✅ Fetched AI meta data from URL {event.ai_meta_data_url}: {metadata}")
+        except Exception as e:
+            print(f"❌ Failed to fetch AI meta data from URL {event.ai_meta_data_url}: {e}")
+            metadata = dto.AiMetadataDto()   # Tạo object rỗng để tránh None
+
+        
+        
+        
+        if await ai_job_service.aiJobWasCancelled(event.ai_job_id):
+            print(f"⚠️ AI Job {event.ai_job_id} đã bị hủy, dừng xử lý.")
+            return
+        
+        if metadata.source_fetched is None or event.is_restart == True:
+            # STEP 1: Download audio từ source_url
+            audio_info = None
+            uploadUrl = None
+            
+            
+            
+            if( event.source_type == LessonSourceType.youtube):
+                audio_info =  media_service.download_youtube_audio(
+                    dto.MediaAudioCreateRequest(
+                        input_url=event.source_url
+                    )
                 )
-            )
-        elif( event.source_type == LessonSourceType.audio_file):
-            audio_info =  media_service.download_audio_file(
-                dto.MediaAudioCreateRequest(
-                    input_url=event.source_url
+            elif( event.source_type == LessonSourceType.audio_file):
+                audio_info =  media_service.download_audio_file(
+                    dto.MediaAudioCreateRequest(
+                        input_url=event.source_url
+                    )
                 )
+            else:
+                raise Exception(f"Unsupported LessonSourceType: {event.source_type}")
+            if await ai_job_service.aiJobWasCancelled(event.ai_job_id):
+                print(f"⚠️ AI Job {event.ai_job_id} đã bị hủy, dừng xử lý.")
+                return
+            uploadUrl = cloud_service.upload_file(
+                audio_info.file_path,
+                public_id= f"lps/lessons/audio/{audio_info.sourceReferenceId}",
+                resource_type= "video" 
             )
+            audio_info.audioUrl = uploadUrl
+            metadata.source_fetched = audio_info.model_dump(by_alias=True)
+            metadataUploadUrl = cloud_service.upload_json_content(
+                json.dumps(metadata.model_dump(by_alias=True)),
+                public_id= f"lps/lessons/{event.lesson_id}/ai-metadata",
+            )
+            print(f"✅ Đã tải audio cho Lesson voi {event.ai_job_id}, file tại: {audio_info.file_path}")
         else:
-            raise Exception(f"Unsupported LessonSourceType: {event.source_type}")
-        print(f"✅ Đã tải audio cho Lesson voi {event.ai_job_id}, file tại: {audio_info.file_path}")
+            audio_info = dto.AudioInfo.model_validate(metadata.source_fetched)
+            print(f"✅ Sử dụng lại audio_info từ AI meta data cho Lesson voi {event.ai_job_id}: {audio_info}")
+            uploadUrl = audio_info.audioUrl
+            isSkip = True
+            metadataUploadUrl = event.ai_meta_data_url
         
-        if ai_job_service.aiJobWasCancelled(event.ai_job_id):
+        
+        if await ai_job_service.aiJobWasCancelled(event.ai_job_id):
             print(f"⚠️ AI Job {event.ai_job_id} đã bị hủy, dừng xử lý.")
             return
         
-        fileUtils.save_json(audio_info.model_dump(by_alias=True), f"lesson_" + audio_info.sourceReferenceId + "_audio_info")
-        uploadUrl = cloud_service.upload_file(
-            audio_info.file_path,
-            public_id= f"lps/lessons/audio/{audio_info.sourceReferenceId}",
-            resource_type= "video" 
-        )
-        
-        if ai_job_service.aiJobWasCancelled(event.ai_job_id):
-            print(f"⚠️ AI Job {event.ai_job_id} đã bị hủy, dừng xử lý.")
-            return
             
             
         await publish_lesson_processing_step_updated(
@@ -71,9 +103,12 @@ async def handleLessonGenerationRequested(event: LessonGenerationRequestedEvent)
                 audioUrl=uploadUrl,
                 sourceReferenceId=audio_info.sourceReferenceId,
                 aiMessage="Audio source fetched successfully.",
-                thumbnailUrl=audio_info.thumbnailUrl
+                thumbnailUrl=audio_info.thumbnailUrl,
+                isSkip=isSkip,
+                aiMetadataUrl=metadataUploadUrl,
             )
         )
+        isSkip = False
         print(f"✅ Đã gửi LessonProcessingStepUpdatedEvent SOURCE_FETCHED cho Lesson với ai_job_id: {event.ai_job_id}")
         # STEP 2: Xử ly audio bằng AI
         # STEP 3: NLP analysis
@@ -142,89 +177,3 @@ async def start_kafka_consumers():
     # Chỉ cần chạy 1 consumer gộp duy nhất
     await consume_events()
 
-# # -----------------------------------------------------------------
-# # 1. BẢO VỆ DATABASE: Giới hạn số tác vụ chạy song song
-# # -----------------------------------------------------------------
-# # Đặt con số này gần bằng với connection pool của CSDL (ví dụ: 20)
-# # Điều này đảm bảo không bao giờ mở quá 20 session CSDL cùng lúc.
-# CONCURRENT_TASK_LIMIT = 20
-# db_semaphore = asyncio.Semaphore(CONCURRENT_TASK_LIMIT)
-
-
-# async def run_handler_with_limit(handler, event):
-#     """
-#     Một "cổng" kiểm soát: phải lấy được 1 vé (semaphore) thì mới cho chạy handler.
-#     Việc này đảm bảo CSDL không bị quá tải.
-#     """
-#     async with db_semaphore:
-#         # Khi đã có "vé", chạy handler (ví dụ: handle_order_created_event)
-#         await handler(event)
-
-# # -----------------------------------------------------------------
-# # 2. HANDLERS: Logic xử lý nghiệp vụ (giữ nguyên)
-# # -----------------------------------------------------------------
-
-# async def handle_order_created_event(event: OrderCreatedEvent):
-#     """Xử lý khi có đơn hàng được tạo."""
-#     db = SessionLocal()
-#     print(f"📥 Nhận OrderCreatedEvent: {event.order_id}")
-#     try:
-#         # Giả lập giữ hàng
-#         if product_repository.decrease_stock_if_available(
-#             event.product_id, event.quantity, db
-#         ):
-#             # Lưu thông tin đơn hàng đã giữ hàng
-#             reserved_order_repository.insert_if_not_exists(
-#                 db, event.order_id, event.product_id, event.quantity
-#             )
-#             print(f"✅ Đã giữ hàng cho Order {event.order_id}")
-            
-#             # Gửi event thành công (đã await)
-#             await publish_inventory_reserved(
-#                 InventoryReservedEvent(
-#                     order_id=event.order_id,
-#                     status="RESERVED",
-#                     message="Hàng đã được giữ thành công.",
-#                 )
-#             )
-#         else:
-#             # Gửi event thất bại (đã await)
-#             await publish_inventory_failed(
-#                 InventoryFailedEvent(
-#                     order_id=event.order_id, 
-#                     status="FAILED", 
-#                     message="Không đủ hàng trong kho."
-#                 )
-#             )
-#     except Exception as e:
-#         print(f"❌ Giữ hàng thất bại (Order {event.order_id}): {e}")
-#         await publish_inventory_failed(
-#             InventoryFailedEvent(
-#                 order_id=event.order_id, status="FAILED", message=str(e)
-#             )
-#         )
-#     finally:
-#         db.close() # Rất quan trọng: Luôn đóng session sau khi xong
-
-
-# async def handle_order_cancelled_event(event: OrderCancelledEvent):
-#     """Xử lý khi đơn hàng bị hủy."""
-#     db = SessionLocal()
-#     print(f"📥 Nhận OrderCancelledEvent: {event.order_id}")
-#     try: # Bọc trong try/finally để đảm bảo db được đóng
-#         reserved_order = reserved_order_repository.get_by_order_id_and_product_id(
-#             db, event.order_id, event.product_id
-#         )
-#         if reserved_order:
-#             # Hoàn trả hàng
-#             product_repository.increase_stock(db, event.product_id, reserved_order.quantity)
-#             reserved_order_repository.delete_reserved_order(db, event.order_id, event.product_id)
-#             print(f"✅ Đã hoàn trả hàng cho Order {event.order_id}")
-#     except Exception as e:
-#          print(f"❌ Hủy hàng thất bại (Order {event.order_id}): {e}")
-#     finally:
-#         db.close() # Rất quan trọng: Luôn đóng session sau khi xong
-
-# # -----------------------------------------------------------------
-# # 3. CONSUMER: Gộp 2 consumer thành 1
-# # -----------------------------------------------------------------

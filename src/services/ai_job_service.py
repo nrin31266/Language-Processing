@@ -15,10 +15,13 @@ from urllib.parse import urlparse # Để lấy tên file gốc từ URL
 from src.redis import redis_service
 
 
-def aiJobWasCancelled(ai_job_id: str) -> bool:
+async def aiJobWasCancelled(ai_job_id: str) -> bool:
     """Kiểm tra xem AI Job có bị hủy không."""
-    status = redis_service.redis_get(f"aiJobStatus:{ai_job_id}")
+    status = await redis_service.redis_get(f"aiJobStatus:{ai_job_id}")
     print(f"🔍 Kiểm tra trạng thái AI Job {ai_job_id}: {status}")
+    if not status:
+        return False  # Chưa có gì → chưa bị hủy
+
     return status.strip('"') == "CANCELLED"
 
 

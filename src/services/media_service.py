@@ -7,7 +7,7 @@ import yt_dlp
 import os
 from datetime import datetime
 import logging as logger
-
+import uuid
 # --- Import mới cho download_audio_file ---
 import requests
 import uuid  # Để tạo tên file an toàn
@@ -165,17 +165,16 @@ def download_audio_file(rq: dto.MediaAudioCreateRequest) -> dto.AudioInfo:
                 for chunk in r_download.iter_content(chunk_size=8192): # Tải từng cục 8KB
                     if chunk:
                         f.write(chunk)
-         # --- BƯỚC 4: LẤY THÔNG TIN (DURATION/TITLE) ---
-        # Lấy tên file gốc (an toàn) từ URL để làm 'title'
-        # Ví dụ: http://.../my song.mp3?query=1 -> my song.mp3
-        original_filename = os.path.basename(urlparse(audio_url).path)
+         # --- BƯỚC 4: LẤY THÔNG TIN TITLE ---
+        parsed_url = urlparse(audio_url)
+        original_filename = os.path.basename(parsed_url.path)
+        # Loai bo đuôi file
+        original_filename = os.path.splitext(original_filename)[0]
         if not original_filename:
-             original_filename = filename # Fallback về tên file UUID
-
-        # # Lấy duration: Cần FFprobe/FFmpeg (giống yt-dlp). 
-        # # Đây là một bước phức tạp, tốn thời gian. Tạm thời để 0.
-        # # Nếu bạn CẦN duration, bạn phải gọi 1 lệnh system os.system(f"ffprobe ...")
-        # duration_sec = 0
+            original_filename = str(uuid.uuid4())
+        
+        print(f"Original filename extracted: {original_filename}")
+            
         
         logger.info(f"Đã tải file audio thành công: {save_path}")
         return dto.AudioInfo(

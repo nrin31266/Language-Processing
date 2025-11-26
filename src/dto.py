@@ -1,8 +1,8 @@
-from typing import Generic, TypeVar, Optional
+from typing import Generic, TypeVar, Optional, Any, Dict
 from pydantic import BaseModel, Field
 from pydantic.generics import GenericModel  # 👈 THÊM DÒNG NÀY
 from datetime import datetime as DateTime
-
+from src.enum   import LessonProcessingStep
 T = TypeVar("T")
 
 
@@ -26,54 +26,6 @@ class ApiResponse(GenericModel, Generic[T]):  # → GenericModel
         return cls(code=code, message=message)
 
 
-# class Product(BaseModel):
-#     id: int
-#     name: str
-#     quantity: int
-#     created_at: Optional[str]
-#     updated_at: Optional[str]
-
-#     class Config:
-#         from_attributes = True
-
-
-# class ReservedOrder(BaseModel):
-#     product_id: str
-#     order_id: str
-#     quantity: int
-
-#     class Config:
-#         from_attributes = True
-
-
-# class ProductResponse(BaseModel):
-#     product_id: str
-#     quantity: int
-
-#     created_at: Optional[DateTime]
-#     updated_at: Optional[DateTime]
-
-#     class Config:
-#         from_attributes = True
-
-
-# class ProductCreationRequest(BaseModel):
-#     quantity: int
-#     price: float
-#     product_id: str
-
-# class MediaAudioResponse(BaseModel):
-#     id: Optional[int]
-#     input_url: str
-#     input_type: str  # e.g., 'youtube, audio_file'
-#     file_path: str
-#     duration: int  # duration in seconds
-#     title: str
-#     created_at: Optional[DateTime]
-
-#     class Config:
-#         from_attributes = True
-    
 class MediaAudioCreateRequest(BaseModel):
     input_url: str
     
@@ -82,6 +34,7 @@ class AudioInfo(BaseModel):
     duration: Optional[int] = None  # duration in seconds
     sourceReferenceId: Optional[str] = Field(None, alias="sourceReferenceId")
     thumbnailUrl: Optional[str] = Field(None, alias="thumbnailUrl")
+    audioUrl: Optional[str] = Field(None, alias="audioUrl")
     class Config:
         from_attributes = True
 
@@ -93,6 +46,24 @@ class AIJobResponse(BaseModel):
 
     class Config:
         from_attributes = True
+# class LessonProcessingStep(str, Enum):
+#     NONE = "NONE"
+#     PROCESSING_STARTED = "PROCESSING_STARTED"
+#     SOURCE_FETCHED = "SOURCE_FETCHED"
+#     TRANSCRIBED = "TRANSCRIBED"
+#     NLP_ANALYZED = "NLP_ANALYZED"
+#     COMPLETED = "COMPLETED"
+#     FAILED = "FAILED"
+
+class AiMetadataDto(BaseModel):
+    source_fetched: Optional[Any] = None
+    transcription_started: Optional[Any] = None
+    nlp_analysis_started: Optional[Any] = None
+
+    class Config:
+        from_attributes = True
+
+
 # class BlogResponse(BaseModel):
 #     id: int
 #     title: str
