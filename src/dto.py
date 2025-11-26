@@ -76,17 +76,23 @@ class ApiResponse(GenericModel, Generic[T]):  # → GenericModel
     
 class MediaAudioCreateRequest(BaseModel):
     input_url: str
-    input_type: str  # e.g., 'youtube, audio_file'
-    # title: Optional[str] = None
     
 class AudioInfo(BaseModel):
     file_path: str
-    duration: int  # duration in seconds
-    title: str
+    duration: Optional[int] = None  # duration in seconds
+    sourceReferenceId: Optional[str] = Field(None, alias="sourceReferenceId")
+    thumbnailUrl: Optional[str] = Field(None, alias="thumbnailUrl")
     class Config:
         from_attributes = True
 
+class AIJobResponse(BaseModel):
+    id: str
+    user_id: str
+    created_at: str
+    updated_at: str
 
+    class Config:
+        from_attributes = True
 # class BlogResponse(BaseModel):
 #     id: int
 #     title: str

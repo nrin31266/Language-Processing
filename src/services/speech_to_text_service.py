@@ -42,43 +42,43 @@
 #         result["segments"], align_model, metadata, audio_path, device
 #     )
 
-#     return get_all_words(aligned)
-# import re
-# FILLER_WORDS = {"uh", "um", "hmm", "mmm", "uhh", "uhhuh", "erm", "ah"}
-# def clean_word(word):
-#     # Bỏ khoảng trắng
-#     w = word.strip()
+#     return aligned
+# # import re
+# # FILLER_WORDS = {"uh", "um", "hmm", "mmm", "uhh", "uhhuh", "erm", "ah"}
+# # def clean_word(word):
+# #     # Bỏ khoảng trắng
+# #     w = word.strip()
 
-#     # Giữ các ký tự hợp lệ: chữ cái, số, dấu nháy ', dấu gạch -
-#     w = re.sub(r"[^a-zA-Z0-9'\-]", "", w)
+# #     # Giữ các ký tự hợp lệ: chữ cái, số, dấu nháy ', dấu gạch -
+# #     w = re.sub(r"[^a-zA-Z0-9'\-]", "", w)
 
-#     # Bỏ filler words
-#     if w.lower() in FILLER_WORDS:
-#         return None
+# #     # Bỏ filler words
+# #     if w.lower() in FILLER_WORDS:
+# #         return None
 
-#     # Không lowercase ở bước này
-#     # để giữ tên riêng, brand, viết tắt (AI, NASA)
+# #     # Không lowercase ở bước này
+# #     # để giữ tên riêng, brand, viết tắt (AI, NASA)
     
-#     return w
+# #     return w
 
-# def get_all_words(aligned_result):
-#     words = []
-#     seen = set()
+# # def get_all_words(aligned_result):
+# #     words = []
+# #     seen = set()
 
-#     for segment in aligned_result["word_segments"]:
-#         raw = segment["word"]
-#         w = clean_word(raw)
+# #     for segment in aligned_result["word_segments"]:
+# #         raw = segment["word"]
+# #         w = clean_word(raw)
 
-#         # bỏ None, rỗng
-#         if not w:
-#             continue
+# #         # bỏ None, rỗng
+# #         if not w:
+# #             continue
 
-#         # kiểm tra duplicate toàn list
-#         wl = w.lower()  # so sánh theo lowercase
-#         if wl in seen:
-#             continue
+# #         # kiểm tra duplicate toàn list
+# #         wl = w.lower()  # so sánh theo lowercase
+# #         if wl in seen:
+# #             continue
         
-#         seen.add(wl)
-#         words.append(w)
+# #         seen.add(wl)
+# #         words.append(w)
 
-#     return words
+# #     return words

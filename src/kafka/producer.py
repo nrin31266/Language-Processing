@@ -2,11 +2,22 @@ import json
 from src.kafka.config import create_kafka_producer
 
 from src.kafka.config import create_kafka_producer
-# from src.kafka.event import InventoryReservedEvent, InventoryFailedEvent
+from src.kafka.event import LessonProcessingStepUpdatedEvent
+from src.kafka.topic import LESSON_PROCESSING_STEP_UPDATED_TOPIC
 import asyncio
+
 producer = create_kafka_producer()
-# TOPIC_INVENTORY_RESERVED = "inventory-reserved"
-# TOPIC_INVENTORY_FAILED = "inventory-failed"
+async def publish_lesson_processing_step_updated(event: LessonProcessingStepUpdatedEvent) -> None:
+    try:
+        producer.produce(
+            topic=LESSON_PROCESSING_STEP_UPDATED_TOPIC,
+            key=str(event.ai_job_id),
+            value=event.model_dump_json(by_alias=True),
+        )
+        # Poll để trigger delivery callbacks
+        await asyncio.to_thread(producer.poll, 0)
+    except Exception as e:
+        print(f"❌ Failed to send LessonProcessingStepUpdatedEvent: {e}")
 # # def _delivery_report(err, msg):
 # #     """Callback cho kết quả gửi message"""
 # #     if err is not None:

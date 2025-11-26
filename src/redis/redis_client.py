@@ -1,10 +1,9 @@
-from redis.asyncio import from_url
+from redis import Redis
 from src.redis.config import RedisConfig
 
 redis_config = RedisConfig()
 
-redis_client = from_url(
+redis_client = Redis.from_url(
     redis_config.url,
-    decode_responses=True,
-    # ssl=True  
+    decode_responses=True
 )

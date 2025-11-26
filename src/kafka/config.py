@@ -17,7 +17,7 @@ def create_kafka_producer() -> Producer:
 def create_kafka_consumer(topics: list[str]) -> Consumer:
     consumer_config = {
         "bootstrap.servers": "localhost:9092", 
-        "group.id": "inventory-service-group", 
+        "group.id": "lp-service-group", 
         "auto.offset.reset": "earliest", # Đọc từ đầu nếu chưa có offset
         "enable.auto.commit": True, # Tự động commit offset
         "auto.commit.interval.ms": 1000, # Commit mỗi giây
