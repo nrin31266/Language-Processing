@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Query
-from src.services.dictionary_service import analyze_word
+from src.services.batch_service import analyze_word
 from src.dto import ApiResponse
 
 

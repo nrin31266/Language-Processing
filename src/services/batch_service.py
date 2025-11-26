@@ -2,6 +2,40 @@ from src.gemini.gemini_service import gemini_generate
 import re
 import json
 from string import Template
+from src.gemini.prompt_sentence_batch import SENTENCE_PROMPT_TEMPLATE
+
+
+async def analyze_sentence_batch(sentences_chunk):
+    """
+    sentences_chunk = [
+        { "order_index": 0, "text": "Hello." },
+        { "order_index": 1, "text": "How are you?" },
+    ]
+    """
+
+    prompt = SENTENCE_PROMPT_TEMPLATE.substitute(
+        sentences_json=json.dumps(sentences_chunk, ensure_ascii=False)
+    )
+    response = gemini_generate(prompt)
+
+    cleaned = clean_json(response)
+
+    data = json.loads(cleaned)
+    return data["sentences"]
+  
+def clean_json(text: str) -> str:
+    """Remove Markdown ```json ... ``` wrapper."""
+    text = re.sub(r"^```json", "", text.strip())
+    text = re.sub(r"^```", "", text)
+    text = re.sub(r"```$", "", text)
+    return text.strip()
+
+
+def analyze_word(word: str):
+    prompt = PROMPT_TEMPLATE.substitute(word=word)
+    response = gemini_generate(prompt)
+    return json.loads(clean_json(response))
+  
 PROMPT_TEMPLATE = Template("""
 You are an English lexical validator and dictionary generator.
 
@@ -61,14 +95,8 @@ STRICT RULES:
 10. NEVER autocorrect capitalization. Use the input exactly.
 """)
 
-def clean_json(text: str) -> str:
-    """Remove Markdown ```json ... ``` wrapper."""
-    text = re.sub(r"^```json", "", text.strip())
-    text = re.sub(r"^```", "", text)
-    text = re.sub(r"```$", "", text)
-    return text.strip()
 
-def analyze_word(word: str):
-    prompt = PROMPT_TEMPLATE.substitute(word=word)
-    response = gemini_generate(prompt)
-    return json.loads(clean_json(response))
+  
+
+
+

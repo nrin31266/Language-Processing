@@ -14,12 +14,17 @@ from src.enum import LessonProcessingStep, LessonSourceType
 from confluent_kafka import KafkaError
 from src.kafka.topic import LESSON_GENERATION_REQUESTED_TOPIC, LESSON_PROCESSING_STEP_UPDATED_TOPIC
 import uuid
+from typing import List
 from src import dto
 from src.services import media_service
 from src.s3_storage import cloud_service
 from src.services import ai_job_service
 from src.services.lesson_service import lessonParseAiMetaData
-from src.services.file_service import fetch_json_from_url
+from src.services.file_service import fetch_json_from_url, file_exists
+from src.services import speech_to_text_service
+from src.services import batch_service
+from src.utils.chunk_utils import chunk_list
+
 async def handleLessonGenerationRequested(event: LessonGenerationRequestedEvent):
     """Xử lý khi có yêu cầu tạo bài học."""
     print(f"📥 Nhận LessonGenerationRequestedEvent: {event}")
@@ -33,25 +38,21 @@ async def handleLessonGenerationRequested(event: LessonGenerationRequestedEvent)
         metadata : dto.AiMetadataDto = None
         try:
             fileMetadata = await fetch_json_from_url(event.ai_meta_data_url)
-            metadata = lessonParseAiMetaData(fileMetadata)
-            print(f"✅ Fetched AI meta data from URL {event.ai_meta_data_url}: {metadata}")
+            metadata = dto.AiMetadataDto.model_validate(fileMetadata)
+            print(f"✅ Fetched AI meta data from URL {event.ai_meta_data_url}")
+            # print(f"🔍 AI Meta Data: {metadata.model_dump()}")
         except Exception as e:
             print(f"❌ Failed to fetch AI meta data from URL {event.ai_meta_data_url}: {e}")
             metadata = dto.AiMetadataDto()   # Tạo object rỗng để tránh None
 
-        
-        
-        
+        audio_info = None
+        uploadUrl = None
         if await ai_job_service.aiJobWasCancelled(event.ai_job_id):
             print(f"⚠️ AI Job {event.ai_job_id} đã bị hủy, dừng xử lý.")
             return
         
-        if metadata.source_fetched is None or event.is_restart == True:
+        if metadata.sourceFetched is None or event.is_restart:
             # STEP 1: Download audio từ source_url
-            audio_info = None
-            uploadUrl = None
-            
-            
             
             if( event.source_type == LessonSourceType.youtube):
                 audio_info =  media_service.download_youtube_audio(
@@ -76,18 +77,31 @@ async def handleLessonGenerationRequested(event: LessonGenerationRequestedEvent)
                 resource_type= "video" 
             )
             audio_info.audioUrl = uploadUrl
-            metadata.source_fetched = audio_info.model_dump(by_alias=True)
+            metadata.sourceFetched = dto.SourceFetchedDto.model_validate(
+                audio_info.model_dump(by_alias=True)
+            )
+
             metadataUploadUrl = cloud_service.upload_json_content(
                 json.dumps(metadata.model_dump(by_alias=True)),
                 public_id= f"lps/lessons/{event.lesson_id}/ai-metadata",
             )
+            metadataUploadUrl = metadataUploadUrl
             print(f"✅ Đã tải audio cho Lesson voi {event.ai_job_id}, file tại: {audio_info.file_path}")
         else:
-            audio_info = dto.AudioInfo.model_validate(metadata.source_fetched)
-            print(f"✅ Sử dụng lại audio_info từ AI meta data cho Lesson voi {event.ai_job_id}: {audio_info}")
+            audio_info = dto.AudioInfo.model_validate(metadata.sourceFetched)
+            print(f"🔁 Sử dụng lại audio_info từ AI meta data cho Lesson voi {event.ai_job_id}: {audio_info}")
             uploadUrl = audio_info.audioUrl
             isSkip = True
             metadataUploadUrl = event.ai_meta_data_url
+            # Kiểm tra file audio có tồn tại không
+            if not file_exists(audio_info.file_path):
+                print(f"⚠️ File audio local không tồn tại tại {audio_info.file_path}, sẽ tải lại từ source_url. Download lại.")
+                audio_info.file_path =  media_service.download_audio_file(
+                    dto.MediaAudioCreateRequest(
+                        input_url=audio_info.audioUrl,
+                        audio_name=audio_info.sourceReferenceId
+                    )
+                ).file_path
         
         
         if await ai_job_service.aiJobWasCancelled(event.ai_job_id):
@@ -109,9 +123,117 @@ async def handleLessonGenerationRequested(event: LessonGenerationRequestedEvent)
             )
         )
         isSkip = False
-        print(f"✅ Đã gửi LessonProcessingStepUpdatedEvent SOURCE_FETCHED cho Lesson với ai_job_id: {event.ai_job_id}")
+        print(f"✅ Đã gửi LessonProcessingStepUpdatedEvent sourceFetched cho Lesson với ai_job_id: {event.ai_job_id}")
         # STEP 2: Xử ly audio bằng AI
+        transcription_result: dto.TranscribedDto = None
+        if( metadata.transcribed is None or event.is_restart):
+            print(f"🔍 Bắt đầu transcribe audio cho Lesson với ai_job_id: {event.ai_job_id}")
+            transcription_result = speech_to_text_service.transcribe(
+                audio_info.file_path,
+            )
+        
+            metadata.transcribed = dto.TranscribedDto.model_validate(transcription_result)
+            print(f"✅ Audio transcribed for Lesson with ai_job_id: {event.ai_job_id}")
+            # Cập nhật lại metadata lên cloud tra ve cung duong dan cu
+            metadataUploadUrl = cloud_service.upload_json_content(
+                json.dumps(metadata.model_dump(by_alias=True), ensure_ascii=False),
+                public_id= f"lps/lessons/{event.lesson_id}/ai-metadata",
+            )
+            print(f"✅ Cập nhật AI meta data lên {metadataUploadUrl} cho Lesson với ai_job_id: {event.ai_job_id}")
+        else:
+            print(f"🔁 Sử dụng lại transcription từ AI meta data cho Lesson voi {event.ai_job_id}")
+            isSkip = True
+            transcription_result = metadata.transcribed
+        
+        if( await ai_job_service.aiJobWasCancelled(event.ai_job_id)):
+            print(f"⚠️ AI Job {event.ai_job_id} đã bị hủy, dừng xử lý.")
+            return
+        await publish_lesson_processing_step_updated(
+            LessonProcessingStepUpdatedEvent(
+                aiJobId=event.ai_job_id,
+                processingStep=LessonProcessingStep.TRANSCRIBED,
+                aiMessage="Audio transcribed successfully.",
+                audioUrl=uploadUrl,
+                isSkip=isSkip,
+                aiMetadataUrl=metadataUploadUrl,
+            )
+        )
+        isSkip = False
+        print(f"✅ Đã gửi LessonProcessingStepUpdatedEvent TRANSCRIBED cho Lesson với ai_job_id: {event.ai_job_id}")
+        
         # STEP 3: NLP analysis
+        nlp_result: dto.NlpAnalyzedDto = None
+
+        segments = transcription_result.segments
+        nlp_sentences: List[dto.SentenceAnalyzedDto] = []
+        batch_size = 5
+
+        # Build payload với index chuẩn
+        sentences_payload = [
+            {"orderIndex": idx, "text": seg.text}
+            for idx, seg in enumerate(segments)
+        ]
+
+
+        if metadata.nlpAnalyzed is None or event.is_restart:
+            print(f"🔍 Bắt đầu NLP analysis cho Lesson với ai_job_id: {event.ai_job_id}")
+
+            for chunk in chunk_list(sentences_payload, batch_size):
+
+                # 1) Check cancel trước mỗi batch
+                if await ai_job_service.aiJobWasCancelled(event.ai_job_id):
+                    print(f"⚠️ AI Job {event.ai_job_id} đã bị hủy, dừng NLP.")
+                    return
+
+                print(f"🧠 NLP batch {chunk[0]['orderIndex']} → {chunk[-1]['orderIndex']} running...")
+                # 2) Gửi batch sang Gemini
+                batch_output = await batch_service.analyze_sentence_batch(chunk)
+
+                # 3) Convert sang DTO
+                for item in batch_output:
+                    nlp_sentences.append(dto.SentenceAnalyzedDto(**item))
+
+                await asyncio.sleep(0.1)   # giảm spam API
+
+            # Full NLP result
+            nlp_result = dto.NlpAnalyzedDto(sentences=nlp_sentences)
+
+            # Lưu vào metadata
+            metadata.nlpAnalyzed = dto.NlpAnalyzedDto.model_validate(nlp_result.model_dump())
+
+            # Upload metadata mới
+            metadataUploadUrl = cloud_service.upload_json_content(
+                json.dumps(metadata.model_dump(by_alias=True), ensure_ascii=False),
+                public_id=f"lps/lessons/{event.lesson_id}/ai-metadata",
+            )
+
+            print(f"✅ NLP analysis hoàn thành và đã upload metadata lên {metadataUploadUrl}")
+
+            await publish_lesson_processing_step_updated(
+                LessonProcessingStepUpdatedEvent(
+                    aiJobId=event.ai_job_id,
+                    processingStep=LessonProcessingStep.NLP_ANALYZED,
+                    aiMessage="NLP analysis completed successfully.",
+                    aiMetadataUrl=metadataUploadUrl,
+                    isSkip=False
+                )
+            )
+
+        else:
+            print(f"🔁 Sử dụng lại NLP metadata cho ai_job_id: {event.ai_job_id}")
+            nlp_result = dto.NlpAnalyzedDto.model_validate(metadata.nlpAnalyzed)
+
+            await publish_lesson_processing_step_updated(
+                LessonProcessingStepUpdatedEvent(
+                    aiJobId=event.ai_job_id,
+                    processingStep=LessonProcessingStep.NLP_ANALYZED,
+                    aiMessage="NLP reused from previous metadata.",
+                    aiMetadataUrl=event.ai_meta_data_url,
+                    isSkip=True
+                )
+            )
+        print(f"✅ Đã gửi LessonProcessingStepUpdatedEvent nlpAnalyzed cho Lesson với ai_job_id: {event.ai_job_id}")
+
     except Exception as e:
         print(f"⚠️ Lỗi khi xử lý LessonGenerationRequestedEvent: {e}")
         await publish_lesson_processing_step_updated(

@@ -1,4 +1,4 @@
-from typing import Generic, TypeVar, Optional, Any, Dict
+from typing import Generic, TypeVar, Optional, Any, Dict, List
 from pydantic import BaseModel, Field
 from pydantic.generics import GenericModel  # 👈 THÊM DÒNG NÀY
 from datetime import datetime as DateTime
@@ -28,6 +28,7 @@ class ApiResponse(GenericModel, Generic[T]):  # → GenericModel
 
 class MediaAudioCreateRequest(BaseModel):
     input_url: str
+    audio_name: Optional[str] = None
     
 class AudioInfo(BaseModel):
     file_path: str
@@ -55,59 +56,56 @@ class AIJobResponse(BaseModel):
 #     COMPLETED = "COMPLETED"
 #     FAILED = "FAILED"
 
-class AiMetadataDto(BaseModel):
-    source_fetched: Optional[Any] = None
-    transcription_started: Optional[Any] = None
-    nlp_analysis_started: Optional[Any] = None
 
+class SourceFetchedDto(BaseModel):
+    file_path: Optional[str] = None
+    duration: Optional[int] = None  # duration in seconds
+    sourceReferenceId: Optional[str] = None
+    thumbnailUrl: Optional[str] = None
+    audioUrl: Optional[str] = None
+    class Config:
+        from_attributes = True
+class WordDto(BaseModel):
+    word: str
+    start: float
+    end: float
+    score: float
     class Config:
         from_attributes = True
 
 
-# class BlogResponse(BaseModel):
-#     id: int
-#     title: str
-#     content: str
-#     published: bool
-#     user_id: str
-
-#     creator: "User"
-#     class Config:
-#         from_attributes = True
-
-# class Blog(BaseModel):
-#     title: str
-#     content: str
-#     published: bool = True
-#     user_id: str
-#     class Config:
-#         from_attributes = True
-
-# class User(BaseModel):
-#     keycloak_id: str
-#     email: str
-#     first_name: str
-#     last_name: str
-
-#     class Config:
-#         from_attributes = True
-
-# class BlogCreateRequest(BaseModel):
-#     title: str
-#     content: str
-#     published: bool = True
-
-# class UserResponse(BaseModel):
-#     keycloak_id: str
-#     email: str
-#     first_name: str
-#     last_name: str
-#     blogs : "List[Blog]"
-
-#     class Config:
-#         from_attributes = True
+class SegmentDto(BaseModel):
+    start: float
+    end: float
+    text: str
+    words: List[WordDto]
+    class Config:
+        from_attributes = True
+    
 
 
-# class LoginRequest(BaseModel):
-#     email: str
-#     password: str
+class TranscribedDto(BaseModel):
+    segments: List[SegmentDto]
+    class Config:
+        from_attributes = True
+class SentenceAnalyzedDto(BaseModel):
+    orderIndex: int
+    phoneticUk: Optional[str] = None
+    phoneticUs: Optional[str] = None
+    translationVi: Optional[str] = None
+    class Config:
+        from_attributes = True
+
+class NlpAnalyzedDto(BaseModel):
+    sentences: List[SentenceAnalyzedDto]
+    class Config:
+        from_attributes = True
+
+class AiMetadataDto(BaseModel):
+    sourceFetched: Optional[SourceFetchedDto] = None
+    transcribed: Optional[TranscribedDto] = None
+    nlpAnalyzed: Optional[NlpAnalyzedDto] = None  # hoặc NlpAnalyzedDto nếu bạn muốn strict
+
+    class Config:
+        from_attributes = True
+

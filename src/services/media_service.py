@@ -153,7 +153,7 @@ def download_audio_file(rq: dto.MediaAudioCreateRequest) -> dto.AudioInfo:
             # Lấy đuôi file từ content-type (ví dụ: 'audio/mpeg' -> '.mp3')
             ext = mimetypes.guess_extension(content_type) or '.dat' # Fallback nếu không đoán được
             # Tạo tên file duy nhất bằng UUID để tránh trùng lặp
-            filename = f"{uuid.uuid4()}{ext}"
+            filename = f"{rq.audio_name}{ext}" if rq.audio_name else f"{uuid.uuid4()}{ext}"
             save_path = os.path.join(AUDIO_SAVE_PATH, filename)
             
         # --- BƯỚC 3: TẢI FILE (STREAM) ---
@@ -165,21 +165,12 @@ def download_audio_file(rq: dto.MediaAudioCreateRequest) -> dto.AudioInfo:
                 for chunk in r_download.iter_content(chunk_size=8192): # Tải từng cục 8KB
                     if chunk:
                         f.write(chunk)
-         # --- BƯỚC 4: LẤY THÔNG TIN TITLE ---
-        parsed_url = urlparse(audio_url)
-        original_filename = os.path.basename(parsed_url.path)
-        # Loai bo đuôi file
-        original_filename = os.path.splitext(original_filename)[0]
-        if not original_filename:
-            original_filename = str(uuid.uuid4())
-        
-        print(f"Original filename extracted: {original_filename}")
             
         
         logger.info(f"Đã tải file audio thành công: {save_path}")
         return dto.AudioInfo(
             file_path=save_path,
-            sourceReferenceId=original_filename,
+            sourceReferenceId=filename,
         )
     except requests.exceptions.Timeout:
         logger.error(f"Lỗi Timeout khi tải file: {audio_url}")
