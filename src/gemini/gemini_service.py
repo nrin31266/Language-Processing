@@ -1,6 +1,6 @@
 import google.generativeai as genai
 from src.gemini.config import config
-
+import json
 # Khởi tạo API key
 genai.configure(api_key=config.api_key)
 
@@ -13,9 +13,6 @@ model = genai.GenerativeModel(
     }
 )
 
-def gemini_generate(prompt: str) -> str:
-    try:
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        raise RuntimeError(f"Gemini API Error: {str(e)}")
+def gemini_generate(prompt: str):
+    response = model.generate_content(prompt)
+    return json.loads(response.text)   # ✔ luôn trả dict

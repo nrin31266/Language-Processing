@@ -18,10 +18,10 @@ async def analyze_sentence_batch(sentences_chunk):
     )
     response = gemini_generate(prompt)
 
-    cleaned = clean_json(response)
+    # cleaned = clean_json(response)
 
-    data = json.loads(cleaned)
-    return data["sentences"]
+    # data = json.loads(cleaned)
+    return response["sentences"]
   
 def clean_json(text: str) -> str:
     """Remove Markdown ```json ... ``` wrapper."""
