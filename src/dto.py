@@ -2,8 +2,45 @@ from typing import Generic, TypeVar, Optional, Any, Dict, List
 from pydantic import BaseModel, Field
 from pydantic.generics import GenericModel  # 👈 THÊM DÒNG NÀY
 from datetime import datetime as DateTime
+from typing import Literal
 from src.enum   import LessonProcessingStep
 T = TypeVar("T")
+class ShadowingWordCompare(BaseModel):
+    position: int
+    expectedWord: Optional[str]
+    recognizedWord: Optional[str]
+    expectedNormalized: Optional[str]
+    recognizedNormalized: Optional[str]
+    status: Literal["CORRECT", "NEAR", "WRONG", "MISSING", "EXTRA"]
+    score: float  # 0.0 – 1.0
+
+class ShadowingResult(BaseModel):
+    sentenceId: int
+    expectedText: str
+    recognizedText: str
+    totalWords: int
+    correctWords: int          # chỉ đếm CORRECT (exact)
+    accuracy: float            # % (correctWords / totalWords)
+    weightedAccuracy: float    # % (theo score)
+    recognizedWordCount: int
+    lastRecognizedPosition: int
+    compares: List[ShadowingWordCompare]
+class ShadowingWord(BaseModel):
+    id: int
+    wordText: str
+    wordLower: str
+    wordNormalized: str
+    wordSlug: str
+    orderIndex: int
+    class Config:
+        from_attributes = True
+
+class ShadowingRequest(BaseModel):
+    sentenceId: int
+    expectedWords: list[ShadowingWord]
+    class Config:
+        from_attributes = True
+
 class TranscriptionSegment(BaseModel):
     start: float
     end: float
@@ -18,6 +55,7 @@ class TranscriptionResponse(BaseModel):
     segments: List[TranscriptionSegment]
     full_text: str
     created_at: DateTime = None
+    shadowingResult: ShadowingResult | None = None  # 👈 thêm
 
     def __init__(self, **data):
         super().__init__(**data)

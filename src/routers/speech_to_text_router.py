@@ -1,7 +1,8 @@
+import json
 import os
 import uuid
-from fastapi import Depends, UploadFile, File, HTTPException, APIRouter, status
-
+from fastapi import Depends, Form, UploadFile, File, HTTPException, APIRouter, status
+from src.services.shadowing_service import build_shadowing_result
 from src import dto
 from src.auth.dto import UserPrincipal
 from src.dto import ApiResponse
@@ -18,16 +19,27 @@ os.makedirs(UPLOAD_DIR, exist_ok=True)
 @router.post("/transcribe", response_model=ApiResponse[dto.TranscriptionResponse])
 async def transcribe_audio(
     file: UploadFile = File(..., description="Audio file to transcribe"),
-    current_user: UserPrincipal = Depends(get_current_user),
+    sentenceId: int = Form(...),
+    expectedWords: str = Form(...),
+    # current_user: UserPrincipal = Depends(get_current_user),
 ):
     """
     Upload audio file and transcribe using WhisperX (async, non-blocking).
     """
-    print(
-        f"User {current_user.first_name + ' ' + current_user.last_name} "
-        f"is uploading file: {file.filename}"
-    )
+    # Parse ShadowingRequest từ Form
+    try:
+        words_raw = json.loads(expectedWords)
+        shadowing_rq = dto.ShadowingRequest(
+            sentenceId=sentenceId,
+            expectedWords=[dto.ShadowingWord(**w) for w in words_raw],
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid expectedWords payload: {e}",
+        )
 
+    print(f"Received shadowing request: {shadowing_rq}")
     try:
         # Kiểm tra file type
         allowed_extensions = {".wav", ".mp3", ".m4a", ".flac", ".ogg", ".webm"}
@@ -54,6 +66,9 @@ async def transcribe_audio(
 
             # Transcribe với WhisperX (async wrapper)
             transcription_result = await transcribe(temp_file_path)
+            
+            # Build shadowing result
+            shadowing_result = build_shadowing_result(shadowing_rq, transcription_result)
 
             # Format response
             segments = []
@@ -74,6 +89,7 @@ async def transcribe_audio(
                 language=transcription_result.get("language", "en"),
                 segments=segments,
                 full_text=transcription_result.get("text", ""),
+                shadowingResult=shadowing_result,  # 👈 gắn vào đây
             )
 
             return ApiResponse.success(data=response)
