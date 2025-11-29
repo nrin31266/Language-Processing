@@ -1,28 +1,37 @@
-from src.gemini.gemini_service import gemini_generate
+# src/services/batch_service.py
+from string import Template
 import re
 import json
-from string import Template
+from typing import Any, List, Dict
+
+from src.gemini.gemini_service import gemini_generate
 from src.gemini.prompt_sentence_batch import SENTENCE_PROMPT_TEMPLATE
 
 
-async def analyze_sentence_batch(sentences_chunk):
+async def analyze_sentence_batch(sentences_chunk: List[Dict[str, Any]]):
     """
     sentences_chunk = [
-        { "order_index": 0, "text": "Hello." },
-        { "order_index": 1, "text": "How are you?" },
+        { "orderIndex": 0, "text": "Hello." },
+        { "orderIndex": 1, "text": "How are you?" },
     ]
-    """
 
+    Trả về list các sentence DTO (dict) theo format Gemini trả về:
+        [{ ... }, { ... }, ...]
+    """
+    # 🔹 TẠO PROMPT
     prompt = SENTENCE_PROMPT_TEMPLATE.substitute(
         sentences_json=json.dumps(sentences_chunk, ensure_ascii=False)
     )
-    response = gemini_generate(prompt)
 
-    # cleaned = clean_json(response)
+    # 🔹 GỌI GEMINI ASYNC
+    resp = await gemini_generate(prompt)
 
-    # data = json.loads(cleaned)
-    return response["sentences"]
-  
+    if not isinstance(resp, dict) or "sentences" not in resp:
+        raise ValueError(f"Gemini response missing 'sentences': {resp}")
+
+    return resp["sentences"]
+
+
 def clean_json(text: str) -> str:
     """Remove Markdown ```json ... ``` wrapper."""
     text = re.sub(r"^```json", "", text.strip())
@@ -31,11 +40,7 @@ def clean_json(text: str) -> str:
     return text.strip()
 
 
-def analyze_word(word: str):
-    prompt = PROMPT_TEMPLATE.substitute(word=word)
-    response = gemini_generate(prompt)
-    return json.loads(clean_json(response))
-  
+
 PROMPT_TEMPLATE = Template("""
 You are an English lexical validator and dictionary generator.
 
@@ -98,5 +103,23 @@ STRICT RULES:
 
   
 
+async def analyze_word(word: str):
+    """
+    Phân tích 1 từ, gọi Gemini async.
+    Trả về dict JSON (đã parse) theo schema ở PROMPT_TEMPLATE.
+    """
+    prompt = PROMPT_TEMPLATE.substitute(word=word)
 
+    resp = await gemini_generate(prompt)
+
+    # gemini_generate đã json.loads → resp thường là dict
+    if isinstance(resp, dict):
+        return resp
+
+    # Fallback: nếu vì lý do gì đó Gemini trả string JSON
+    if isinstance(resp, str):
+        return json.loads(clean_json(resp))
+
+    # Nếu format lạ thì cố parse lại
+    return json.loads(clean_json(str(resp)))
 

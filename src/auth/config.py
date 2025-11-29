@@ -10,3 +10,4 @@ class KeycloakConfig(BaseSettings):
         "env_prefix": "KEYCLOAK_",
         "extra": "ignore"
     }
+keycloak_config = KeycloakConfig()  # instance

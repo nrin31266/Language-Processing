@@ -4,7 +4,27 @@ from pydantic.generics import GenericModel  # 👈 THÊM DÒNG NÀY
 from datetime import datetime as DateTime
 from src.enum   import LessonProcessingStep
 T = TypeVar("T")
+class TranscriptionSegment(BaseModel):
+    start: float
+    end: float
+    text: str
+    words: Optional[List[Dict[str, Any]]] = []
 
+class TranscriptionResponse(BaseModel):
+    id: str
+    filename: str
+    duration: float
+    language: str
+    segments: List[TranscriptionSegment]
+    full_text: str
+    created_at: DateTime = None
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        self.created_at = DateTime.now()
+
+class TranscribeUrlRequest(BaseModel):
+    audio_url: str
 
 class ApiResponse(GenericModel, Generic[T]):  # → GenericModel
     """
