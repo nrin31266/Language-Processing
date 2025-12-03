@@ -113,12 +113,9 @@ app.add_middleware(
 
 
 # --- 6. Include các Routers ---
-from src.routers import media_router, speech_to_text, redis_router, tts_router, dictionary_router, ai_job_router, speech_to_text_router
+from src.routers import tts_router, dictionary_router, ai_job_router, speech_to_text_router
 app.include_router(speech_to_text_router.router)
 app.include_router(ai_job_router.router)
-app.include_router(media_router.router)
-app.include_router(speech_to_text.router)
-app.include_router(redis_router.router)
 app.include_router(tts_router.router)
 app.include_router(dictionary_router.router)
 # app.include_router(blog.router)

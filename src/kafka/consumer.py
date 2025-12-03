@@ -223,44 +223,59 @@ async def handleLessonGenerationRequested(event: LessonGenerationRequestedEvent)
         )
 
         # ───────────────────────────────────────────
-        # STEP 3: NLP analysis
+        # STEP 3: NLP analysis (chạy batch song song)
         # ───────────────────────────────────────────
         nlp_result: dto.NlpAnalyzedDto
 
         segments = transcription_result.segments
-        nlp_sentences: List[dto.SentenceAnalyzedDto] = []
-        batch_size = 10
-
-        # Build payload với index chuẩn (orderIndex)
         sentences_payload = [
             {"orderIndex": idx, "text": seg.text} for idx, seg in enumerate(segments)
         ]
+
+        batch_size = 10
+        max_concurrency = 3  # muốn 3 batch song song
 
         if metadata.nlpAnalyzed is None or event.is_restart:
             print(
                 f"🔍 Bắt đầu NLP analysis cho Lesson với ai_job_id: {event.ai_job_id}"
             )
 
-            for chunk in chunk_list(sentences_payload, batch_size):
-                # 1) Check cancel trước mỗi batch
+            chunks = list(chunk_list(sentences_payload, batch_size))
+            nlp_sentences: List[dto.SentenceAnalyzedDto] = []
+
+            # chạy từng "wave", mỗi wave tối đa 3 chunk
+            for i in range(0, len(chunks), max_concurrency):
                 if await ai_job_service.aiJobWasCancelled(event.ai_job_id):
                     print(f"⚠️ AI Job {event.ai_job_id} đã bị hủy, dừng NLP.")
                     return
 
+                wave = chunks[i : i + max_concurrency]
+
                 print(
-                    f"🧠 NLP batch {chunk[0]['orderIndex']} → {chunk[-1]['orderIndex']} running..."
+                    f"🧠 NLP wave {i // max_concurrency + 1}: "
+                    f"{wave[0][0]['orderIndex']} → {wave[-1][-1]['orderIndex']} running..."
                 )
 
-                # 2) Gửi batch sang Gemini (async)
-                batch_output = await batch_service.analyze_sentence_batch(chunk)
+                # tạo tasks cho từng chunk trong wave
+                tasks = [
+                    batch_service.analyze_sentence_batch(chunk)
+                    for chunk in wave
+                ]
 
-                # 3) Convert sang DTO
-                for item in batch_output:
-                    nlp_sentences.append(dto.SentenceAnalyzedDto(**item))
+                wave_results = await asyncio.gather(*tasks, return_exceptions=True)
 
-                await asyncio.sleep(0.1)  # giảm spam API
+                for chunk, result in zip(wave, wave_results):
+                    if isinstance(result, Exception):
+                        # tuỳ bạn xử lý: raise luôn hay log + skip
+                        print(f"⚠️ Lỗi NLP batch {chunk[0]['orderIndex']} → {chunk[-1]['orderIndex']}: {result}")
+                        raise result
 
-            # Full NLP result
+                    for item in result:
+                        nlp_sentences.append(dto.SentenceAnalyzedDto(**item))
+
+            # sắp xếp lại cho chắc (nếu sau này cần guarantee order)
+            nlp_sentences.sort(key=lambda s: s.orderIndex)
+
             nlp_result = dto.NlpAnalyzedDto(sentences=nlp_sentences)
 
             # Lưu vào metadata
@@ -268,7 +283,6 @@ async def handleLessonGenerationRequested(event: LessonGenerationRequestedEvent)
                 nlp_result.model_dump()
             )
 
-            # Upload metadata mới
             metadataUploadUrl = await cloud_service.upload_json_content(
                 json.dumps(metadata.model_dump(by_alias=True), ensure_ascii=False),
                 public_id=f"lps/lessons/{event.lesson_id}/ai-metadata",

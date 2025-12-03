@@ -43,20 +43,6 @@ def _levenshtein_distance(a: str, b: str) -> int:
     return dp[la][lb]
 
 
-def _word_similarity(a: str, b: str) -> float:
-    """
-    Similarity dựa trên Levenshtein:
-    similarity = 1 - dist / max_len
-    """
-    if not a and not b:
-        return 1.0
-    if not a or not b:
-        return 0.0
-
-    dist = _levenshtein_distance(a, b)
-    max_len = max(len(a), len(b))
-    return max(0.0, 1.0 - dist / max_len)
-
 
 # ─────────────────────────────────────────────
 # 2. Phân loại 1 từ (status + score)
