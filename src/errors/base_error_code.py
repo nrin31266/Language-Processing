@@ -3,7 +3,7 @@ from enum import Enum
 
 
 class BaseErrorCode(Enum):
-    # 🔹 Common errors
+    # Common errors
     INTERNAL_SERVER_ERROR = (9999, "Lỗi máy chủ nội bộ", HTTPStatus.INTERNAL_SERVER_ERROR)
     
     
@@ -21,5 +21,5 @@ class BaseErrorCode(Enum):
         self.status = status
 
     def format_message(self, *args):
-        """Tương tự String.format() trong Java"""
+        """Same String.format() in Java"""
         return self.message % args if args else self.message

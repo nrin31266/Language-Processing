@@ -7,9 +7,9 @@ from src.gemini.config import config
 # Khởi tạo API key
 genai.configure(api_key=config.api_key)
 
-# Model dùng cho NLP 5 câu/batch
+# Model dùng cho NLP 
 model = genai.GenerativeModel(
-    model_name=config.model,  # ví dụ: "gemini-2.5-flash"
+    model_name=config.model,  # Ex: "gemini-2.5-flash"
     generation_config={
         "temperature": 0,
         "response_mime_type": "application/json",
@@ -24,8 +24,8 @@ async def gemini_generate(prompt: str):
     Chạy generate_content ở thread pool để không block event loop,
     sau đó parse JSON và trả về dict.
     """
-    # generate_content là hàm sync → đưa sang thread khác
+    # sync → đưa sang thread khác
     response = await asyncio.to_thread(model.generate_content, prompt)
 
     # response.text là chuỗi JSON (theo response_mime_type)
-    return json.loads(response.text)  # ✔ luôn trả dict
+    return json.loads(response.text)  # Luôn trả về dict

@@ -6,7 +6,7 @@ class GeminiConfig(BaseSettings):
 
     model_config = {
         "env_file": ".env",
-        "env_prefix": "GEMINI_",   # đọc GEMINI_API_KEY và GEMINI_MODEL
+        "env_prefix": "GEMINI_",   
         "extra": "ignore"
     }
 

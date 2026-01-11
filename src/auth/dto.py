@@ -1,11 +1,3 @@
-# from pydantic import BaseModel
-# from typing import List
-
-# class User(BaseModel):
-#     id: str
-#     username: str
-#     email: str
-#     roles: List[str]
 
 
 from pydantic import BaseModel

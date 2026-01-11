@@ -2,16 +2,12 @@ import asyncio
 from src import dto
 from src.errors.base_exception import BaseException
 from src.errors.base_error_code import BaseErrorCode
-from src.s3_storage  import cloud_service
 import yt_dlp
 import os
-from datetime import datetime
 import logging as logger
 import uuid
-# --- Import mới cho download_audio_file ---
 import requests
 import mimetypes # Để đoán đuôi file
-from urllib.parse import urlparse # Để lấy tên file gốc từ URL
 
 # PHẦN LẤY THÔNG TIN (INFO EXTRACTOR)
 YDL_INFO_OPTS = {
@@ -45,14 +41,12 @@ YDL_DOWNLOAD_OPTS = {
 # TẠO ĐỐI TƯỢNG DOWNLOADER TOÀN CỤC
 ydl_downloader = yt_dlp.YoutubeDL(YDL_DOWNLOAD_OPTS)
 
-# Giới hạn kích thước file tải về từ URL (ví dụ: 50MB)
+# Giới hạn kích thước file tải về từ URL 
 MAX_AUDIO_SIZE_BYTES = 50 * 1024 * 1024  # 50MB
 
 
-# =========================
-#  YOUTUBE AUDIO (SYNC)
-# =========================
 
+#  YOUTUBE AUDIO (SYNC)
 def _download_youtube_audio_sync(rq: dto.MediaAudioCreateRequest) -> dto.AudioInfo:
     print("Đang lấy thông tin video...")
 
@@ -104,23 +98,12 @@ def _download_youtube_audio_sync(rq: dto.MediaAudioCreateRequest) -> dto.AudioIn
         )
 
 
-# =========================
 #  YOUTUBE AUDIO (ASYNC)
-# =========================
-
 async def download_youtube_audio(rq: dto.MediaAudioCreateRequest) -> dto.AudioInfo:
-    """
-    Hàm async để dùng trong consumer:
-    audio_info = await download_youtube_audio(...)
-    Bên trong sẽ chạy sync code ở thread khác nên không block event loop.
-    """
     return await asyncio.to_thread(_download_youtube_audio_sync, rq)
 
 
-# =========================
 #  DOWNLOAD AUDIO FILE (SYNC)
-# =========================
-
 def _download_audio_file_sync(rq: dto.MediaAudioCreateRequest) -> dto.AudioInfo:
     """
     Tải file audio từ một URL bất kỳ (phiên bản an toàn) - BLOCKING.
@@ -129,11 +112,11 @@ def _download_audio_file_sync(rq: dto.MediaAudioCreateRequest) -> dto.AudioInfo:
     audio_url = rq.input_url
     logger.info(f"Bắt đầu xử lý file audio từ URL: {audio_url}")
     try:
-        # --- BƯỚC 1: KIỂM TRA HEADERS (VALIDATION) ---
+        # KIỂM TRA HEADERS (VALIDATION)
         with requests.head(audio_url, allow_redirects=True, timeout=5) as head_resp:
             head_resp.raise_for_status()  # Ném lỗi nếu status không phải 2xx
 
-            # 1.1. Kiểm tra loại file (Content-Type)
+            # Kiểm tra loại file (Content-Type)
             content_type = head_resp.headers.get('Content-Type', '').lower()
             if not content_type.startswith('audio/'):
                 logger.warning(
@@ -144,7 +127,7 @@ def _download_audio_file_sync(rq: dto.MediaAudioCreateRequest) -> dto.AudioInfo:
                     message=f"URL không trỏ đến file audio (phát hiện: {content_type})"
                 )
 
-            # 1.2. Kiểm tra dung lượng (Content-Length)
+            # Kiểm tra dung lượng (Content-Length)
             content_length = head_resp.headers.get('Content-Length')
             if content_length and int(content_length) > MAX_AUDIO_SIZE_BYTES:
                 file_size_mb = int(content_length) / 1024 / 1024
@@ -160,7 +143,7 @@ def _download_audio_file_sync(rq: dto.MediaAudioCreateRequest) -> dto.AudioInfo:
                     )
                 )
 
-            # --- BƯỚC 2: TẠO TÊN FILE AN TOÀN ---
+            # TẠO TÊN FILE AN TOÀN
             # Lấy đuôi file từ content-type (ví dụ: 'audio/mpeg' -> '.mp3')
             ext = mimetypes.guess_extension(content_type) or '.dat'  # Fallback nếu không đoán được
             # Tạo tên file duy nhất bằng UUID để tránh trùng lặp
@@ -171,7 +154,7 @@ def _download_audio_file_sync(rq: dto.MediaAudioCreateRequest) -> dto.AudioInfo:
             )
             save_path = os.path.join(AUDIO_SAVE_PATH, filename)
 
-        # --- BƯỚC 3: TẢI FILE (STREAM) ---
+        # TẢI FILE (STREAM) 
         logger.info(f"Đang tải file về {save_path}...")
         with requests.get(audio_url, stream=True, timeout=60) as r_download:
             r_download.raise_for_status()
@@ -208,15 +191,6 @@ def _download_audio_file_sync(rq: dto.MediaAudioCreateRequest) -> dto.AudioInfo:
             message=f"Lỗi hệ thống khi xử lý file: {str(e)}"
         )
 
-
-# =========================
 #  DOWNLOAD AUDIO FILE (ASYNC)
-# =========================
-
 async def download_audio_file(rq: dto.MediaAudioCreateRequest) -> dto.AudioInfo:
-    """
-    Hàm async để dùng trong consumer:
-    audio_info = await download_audio_file(...)
-    Bên trong sẽ chạy blocking I/O của requests ở thread pool.
-    """
     return await asyncio.to_thread(_download_audio_file_sync, rq)

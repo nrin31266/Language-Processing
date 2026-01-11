@@ -105,14 +105,7 @@ class AIJobResponse(BaseModel):
 
     class Config:
         from_attributes = True
-# class LessonProcessingStep(str, Enum):
-#     NONE = "NONE"
-#     PROCESSING_STARTED = "PROCESSING_STARTED"
-#     SOURCE_FETCHED = "SOURCE_FETCHED"
-#     TRANSCRIBED = "TRANSCRIBED"
-#     NLP_ANALYZED = "NLP_ANALYZED"
-#     COMPLETED = "COMPLETED"
-#     FAILED = "FAILED"
+
 
 
 class SourceFetchedDto(BaseModel):
@@ -159,10 +152,10 @@ class NlpAnalyzedDto(BaseModel):
     class Config:
         from_attributes = True
 
-class AiMetadataDto(BaseModel):
+class LessonGenerationAiMetadataDto(BaseModel):
     sourceFetched: Optional[SourceFetchedDto] = None
     transcribed: Optional[TranscribedDto] = None
-    nlpAnalyzed: Optional[NlpAnalyzedDto] = None  # hoặc NlpAnalyzedDto nếu bạn muốn strict
+    nlpAnalyzed: Optional[NlpAnalyzedDto] = None  
 
     class Config:
         from_attributes = True

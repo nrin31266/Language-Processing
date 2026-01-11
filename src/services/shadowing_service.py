@@ -7,10 +7,7 @@ from src.services.file_service import normalize_word_lower
 RecToken = Tuple[str, str]
 
 
-# ─────────────────────────────────────────────
-# 1. Levenshtein distance + similarity
-# ─────────────────────────────────────────────
-
+# Levenshtein distance + similarity
 def _levenshtein_distance(a: str, b: str) -> int:
     """
     Levenshtein distance đơn giản O(len(a) * len(b)).
@@ -44,10 +41,8 @@ def _levenshtein_distance(a: str, b: str) -> int:
 
 
 
-# ─────────────────────────────────────────────
-# 2. Phân loại 1 từ (status + score)
-# ─────────────────────────────────────────────
 
+# Phân loại 1 từ (status + score)
 def _classify_word(
     expected_norm: str | None,
     recognized_norm: str | None,
@@ -70,7 +65,7 @@ def _classify_word(
 
         # 1) Rất gần: sai 1 ký tự (vd: news/new, learning/learnin)
         if dist == 1:
-            # từ ngắn → nương tay hơn
+            # từ ngắn -> nương tay hơn
             if max_len <= 4:
                 return "NEAR", 0.95
             elif max_len <= 7:
@@ -83,7 +78,7 @@ def _classify_word(
         if sim >= 0.8:
             return "NEAR", 0.7
 
-        # 3) Còn lại → sai hẳn
+        # 3) Còn lại -> sai hẳn
         return "WRONG", 0.0
 
     # Thiếu từ
@@ -94,14 +89,12 @@ def _classify_word(
     if not expected_norm and recognized_norm:
         return "EXTRA", 0.0
 
-    # Cả 2 None (hiếm) -> coi như WRONG
+    # Fallback
     return "WRONG", 0.0
 
 
-# ─────────────────────────────────────────────
-# 3. Helper: lấy recognized text + tokens
-# ─────────────────────────────────────────────
 
+# Helper: lấy recognized text + tokens
 def _extract_recognized_tokens(transcription_result: dict) -> tuple[str, List[RecToken]]:
     """
     Lấy ra:
@@ -133,10 +126,7 @@ def _extract_recognized_tokens(transcription_result: dict) -> tuple[str, List[Re
     return recognized_text, rec_items
 
 
-# ─────────────────────────────────────────────
-# 4. Main: build_shadowing_result
-# ─────────────────────────────────────────────
-
+# Main: build_shadowing_result
 def build_shadowing_result(
     rq: ShadowingRequest,
     transcription_result: dict,

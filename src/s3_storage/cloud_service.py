@@ -10,10 +10,6 @@ from src.errors.base_error_code import BaseErrorCode
 logger = logging.getLogger(__name__)
 
 
-# =========================
-#  SYNC IMPLEMENTATION
-# =========================
-
 def _upload_file_sync(
     file_source: Union[str, IO],
     public_id: str,  # đường dẫn, tên file trên cloudinary. Example: "folder/subfolder/filename"
@@ -55,10 +51,6 @@ def _upload_file_sync(
 
 
 def _upload_json_content_sync(json_str: str, public_id: str) -> str:
-    """
-    Sync: Upload nội dung JSON trực tiếp lên Cloudinary.
-    Dùng nội bộ, bọc bởi hàm async upload_json_content().
-    """
     try:
         logger.info(f"Uploading JSON content as {public_id}.json...")
 
@@ -96,8 +88,6 @@ async def upload_file(
     resource_type: str = "auto",
 ) -> str:
     """
-    Async: Upload file lên Cloudinary ở thread pool, KHÔNG block event loop.
-
     Ví dụ dùng:
         url = await cloud_service.upload_file(path, public_id="lps/lessons/audio/123", resource_type="video")
     """
@@ -112,7 +102,6 @@ async def upload_file(
 async def upload_json_content(json_str: str, public_id: str) -> str:
     """
     Async: Upload JSON lên Cloudinary ở thread pool, KHÔNG block event loop.
-
     Ví dụ dùng:
         url = await cloud_service.upload_json_content(json.dumps(data), public_id="lps/lessons/1/ai-metadata")
     """

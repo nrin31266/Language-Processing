@@ -4,48 +4,43 @@ SENTENCE_PROMPT_TEMPLATE = Template("""
 You are an English linguistic interpretation engine.
 
 TASK:
-You will analyze up to 5 English sentences.  
-For EACH sentence, return English phonetics (UK + US) and a natural Vietnamese translation.
+Analyze up to $max_sentences English sentences.
+For EACH sentence, return:
+- UK IPA (full sentence)
+- US IPA (full sentence)
+- Natural Vietnamese translation
 
 INPUT (JSON):
-A list of objects. Each object contains:
-{
-  "orderIndex": number,
-  "text": "sentence text"
-}
+A JSON array of objects:
+[
+  { "orderIndex": number, "text": "sentence text" }
+]
 
-REQUIREMENTS:
-1. **Output MUST be valid JSON ONLY** — no markdown, no commentary, no extra text.
-2. Keep exact ordering by `orderIndex`.
-3. For each sentence, return object:
-   {
-     "orderIndex": number,
-     "phoneticUk": "",
-     "phoneticUs": "",
-     "translationVi": ""
-   }
-4. **Phonetics rules**:
-   - Provide full-sentence phonetic transcription in IPA.
-   - If unsure about a sound, leave field as empty string "".
-   - Do NOT break into words — full sentence phonetic only.
-5. **Vietnamese translation rules**:
-   - Must be natural, smooth, đúng ngữ cảnh.
-   - Không dịch word-by-word máy móc.
-6. Do NOT rewrite or fix grammar of the input sentence.  
-   Translate meaning exactly as written.
+STRICT REQUIREMENTS:
+1) Output MUST be valid JSON ONLY. No markdown. No code fences.
+2) Output MUST be a JSON array with EXACTLY the same number of items as input.
+3) Each input orderIndex MUST appear exactly once in output.
+4) Keep ordering by orderIndex ascending.
+5) Do NOT rewrite or fix grammar of input text.
 
-RETURN ONLY THIS:
-{
-  "sentences": [
-     {
-       "orderIndex": number,
-       "phoneticUk": "",
-       "phoneticUs": "",
-       "translationVi": ""
-     }
-  ]
-}
+OUTPUT FORMAT (JSON array only):
+[
+  {
+    "orderIndex": number,
+    "phoneticUk": "",
+    "phoneticUs": "",
+    "translationVi": ""
+  }
+]
 
-NOW ANALYZE THE FOLLOWING SENTENCES:
+PHONETICS RULES:
+- Use IPA, full sentence only (do not split words).
+- Best effort. If truly unsure, use "".
+
+TRANSLATION RULES:
+- Natural Vietnamese, đúng ngữ cảnh.
+- Do not translate word-by-word.
+
+NOW ANALYZE:
 $sentences_json
 """)

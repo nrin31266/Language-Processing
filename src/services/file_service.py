@@ -3,34 +3,29 @@ import httpx
 import json
 import os
 import json
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 from pydantic import ValidationError
-from src.dto import AiMetadataDto
+from src.dto import LessonGenerationAiMetadataDto
 
 
 
 
-def lessonParseAiMetaData(metadata: Optional[Any]) -> AiMetadataDto:
-    """
-    Parse metadata (string JSON hoặc dict) thành AiMetadataDto.
-    Trả về DTO rỗng nếu metadata null hoặc lỗi format.
-    """
+def lesson_parse_ai_meta_data(metadata: Optional[Any]) -> LessonGenerationAiMetadataDto:
 
     if not metadata:
-        return AiMetadataDto()  # metadata rỗng
+        return LessonGenerationAiMetadataDto()  # metadata rỗng
 
-    # 1. Nếu là string → parse JSON
+    # Nếu là string -> parse JSON
     if isinstance(metadata, str):
         try:
             data = json.loads(metadata)
         except Exception:
-            # JSON lỗi → trả rỗng
-            return AiMetadataDto()
-    # 2. Nếu là dict → dùng luôn
+            return LessonGenerationAiMetadataDto()
+    # Nếu là dict -> dùng luôn
     elif isinstance(metadata, dict):
         data = metadata
     else:
-        return AiMetadataDto()
+        return LessonGenerationAiMetadataDto()
 
     # Chuẩn hóa key: camelCase → snake_case
     normalized = {}
@@ -45,12 +40,11 @@ def lessonParseAiMetaData(metadata: Optional[Any]) -> AiMetadataDto:
 
     # Parse DTO
     try:
-        return AiMetadataDto(**normalized)
+        return LessonGenerationAiMetadataDto(**normalized)
     except ValidationError:
-        return AiMetadataDto()
+        return LessonGenerationAiMetadataDto()
 
 async def fetch_json_from_url(url: str):
-    """Download JSON từ URL và trả về dict."""
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.get(url)
@@ -63,8 +57,6 @@ async def fetch_json_from_url(url: str):
 def file_exists(path: str) -> bool:
     """
     Kiểm tra file local có tồn tại trong hệ thống hay không.
-    :param path: đường dẫn file, vd: 'src/temp/audio_files/file.mp3'
-    :return: True nếu tồn tại, False nếu không
     """
     return os.path.isfile(path)
 def remove_local_file(file_path: str):
@@ -73,23 +65,19 @@ def remove_local_file(file_path: str):
         print(f"Đã xóa file tạm thời: {file_path}")
     except OSError as e:
         print(f"Lỗi khi xóa file {file_path}: {e.strerror}")
+        
+
 # src/utils/text_utils.py
-
-
-
 import re
 import unicodedata
 from typing import Optional
 
-# Các punctuation phổ biến trong tiếng Anh (giống bên Java)
+# Các punctuation phổ biến trong tiếng Anh 
 _PUNCTS = '.,!?;:"()[]{}…—–-'
 
 
 def has_punctuation(token: Optional[str]) -> bool:
     """
-    Tương đương Java:
-      public boolean hasPunctuation(String token)
-
     Trả về True nếu trong token có bất kỳ ký tự punctuation trong _PUNCTS.
     """
     if not token:  # None hoặc rỗng
@@ -100,9 +88,6 @@ def has_punctuation(token: Optional[str]) -> bool:
 
 def normalize_word_lower(token: Optional[str]) -> Optional[str]:
     """
-    Tương đương Java:
-      public String normalizeWordLower(String token)
-
     - lower-case
     - bỏ dấu '
     - chỉ giữ [a-z0-9]
@@ -111,16 +96,13 @@ def normalize_word_lower(token: Optional[str]) -> Optional[str]:
         return None
 
     s = token.lower().replace("'", "")  # it's -> its
-    # ❗ giữ lại chữ + số
+    # giữ lại chữ + số
     s = re.sub(r"[^a-z0-9]", "", s)
     return s
 
 
 def to_slug(value: Optional[str]) -> Optional[str]:
     """
-    Tương đương Java:
-      public String toSlug(String input)
-
     - Bỏ dấu tiếng Việt (normalize unicode NFD + remove combining marks)
     - Chỉ giữ a-z, 0-9, space, '-'
     - Space -> '-'
@@ -129,7 +111,7 @@ def to_slug(value: Optional[str]) -> Optional[str]:
     if value is None:
         return None
 
-    # 1) Normalize unicode (loại dấu tiếng Việt)
+    # Normalize unicode (loại dấu tiếng Việt)
     normalized = unicodedata.normalize("NFD", value)
     # Bỏ các ký tự dấu (combining diacritical marks)
     without_accents = "".join(
@@ -137,13 +119,13 @@ def to_slug(value: Optional[str]) -> Optional[str]:
         if unicodedata.category(ch) != "Mn"  # Mn = Mark, Nonspacing
     )
 
-    # 2) Chỉ giữ a-z, 0-9, space và '-'
+    # Chỉ giữ a-z, 0-9, space và '-'
     cleaned = re.sub(r"[^a-z0-9\s-]", "", without_accents.lower())
 
-    # 3) Replace space thành dấu '-'
+    # Replace space thành dấu '-'
     dashed = re.sub(r"\s+", "-", cleaned.strip())
 
-    # 4) Remove multiple hyphens
+    # Remove multiple hyphens
     slug = re.sub(r"-{2,}", "-", dashed)
 
     return slug

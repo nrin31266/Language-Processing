@@ -61,7 +61,7 @@ async def transcribe_audio(
             buffer.write(content)
 
         try:
-            # Get audio duration (async wrapper → chạy trong thread pool)
+            # Get audio duration (async wrapper -> chạy trong thread pool)
             duration = await get_audio_duration(temp_file_path)
 
             # Transcribe với WhisperX (async wrapper)
@@ -89,13 +89,13 @@ async def transcribe_audio(
                 language=transcription_result.get("language", "en"),
                 segments=segments,
                 full_text=transcription_result.get("text", ""),
-                shadowingResult=shadowing_result,  # 👈 gắn vào đây
+                shadowingResult=shadowing_result,  # gắn vào đây
             )
 
             return ApiResponse.success(data=response)
 
         finally:
-            # 🧹 Cleanup: Xóa file tạm sau khi xử lý
+            # Cleanup: Xóa file tạm sau khi xử lý
             if os.path.exists(temp_file_path):
                 os.remove(temp_file_path)
                 print(f"Temporary file removed: {temp_file_path}")

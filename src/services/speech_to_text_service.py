@@ -1,5 +1,3 @@
-# src/services/speech_to_text_service.py
-
 import asyncio
 import os
 
@@ -11,25 +9,20 @@ from src import dto
 from src.errors.base_exception import BaseException
 from src.errors.base_error_code import BaseErrorCode
 
-# -------------------
-# 1. Device + ASR model
-# -------------------
+# Device + ASR model
 device = "cuda" if torch.cuda.is_available() else "cpu"
 compute_type = "float16" if device == "cuda" else "float32"
 
-print(f"🔄 [WhisperX] Loading ASR model (base.en) on {device} ({compute_type})...")
+print(f"[WhisperX] Loading ASR model (base.en) on {device} ({compute_type})...")
 with torch.no_grad():
   whisper_model = whisperx.load_model(
       "base.en",
       device=device,
       compute_type=compute_type,
   )
-print("✨ [WhisperX] ASR model loaded successfully!")
+print("✅ [WhisperX] ASR model loaded successfully!")
 
-# -------------------
-# 2. Align model cache (per language)
-# -------------------
-
+# Align model cache (per language)
 _align_model_cache: dict[str, tuple[object, dict]] = {}
 
 
@@ -44,20 +37,17 @@ def _get_align_model(language_code: str) -> tuple[object, dict]:
     if language_code in _align_model_cache:
         return _align_model_cache[language_code]
 
-    print(f"🔄 [WhisperX] Loading align model for language={language_code} on {device}...")
+    print(f"[WhisperX] Loading align model for language={language_code} on {device}...")
     with torch.no_grad():
         align_model, metadata = whisperx.load_align_model(
             language_code=language_code,
             device=device,
         )
     _align_model_cache[language_code] = (align_model, metadata)
-    print(f"✨ [WhisperX] Align model for {language_code} loaded & cached.")
+    print(f"✅ [WhisperX] Align model for {language_code} loaded & cached.")
     return align_model, metadata
 
 
-# =========================
-#  SYNC IMPLEMENTATION
-# =========================
 
 def _get_audio_duration_sync(path: str) -> float:
     if not os.path.exists(path):
@@ -75,15 +65,11 @@ def _get_audio_duration_sync(path: str) -> float:
 
 
 def _transcribe_sync(audio_path: str):
-    """
-    Hàm sync gọi WhisperX để transcribe + align.
-    Dùng nội bộ, bọc bởi async transcribe().
-    """
     with torch.no_grad():
-        # 1. WhisperX transcription
+        # WhisperX transcription
         result = whisper_model.transcribe(audio_path, batch_size=4)
 
-        # 2. WhisperX alignment (dùng model cache)
+        # WhisperX alignment (dùng model cache)
         language_code = result.get("language") or "en"
         align_model, metadata = _get_align_model(language_code)
 
@@ -95,29 +81,18 @@ def _transcribe_sync(audio_path: str):
             device,
         )
 
-    # 🧹 Chỉ xóa đúng trường 'word_segments'
+    # Chỉ xóa đúng trường 'word_segments'
     if isinstance(aligned, dict):
         aligned.pop("word_segments", None)
 
     return aligned
 
 
-# =========================
-#  ASYNC WRAPPERS
-# =========================
 
+#  ASYNC WRAPPERS
 async def get_audio_duration(path: str) -> float:
-    """
-    Async wrapper cho việc lấy duration audio.
-    Chạy trong thread pool để không block event loop.
-    """
     return await asyncio.to_thread(_get_audio_duration_sync, path)
 
 
 async def transcribe(audio_path: str):
-    """
-    Async wrapper cho WhisperX transcribe + align.
-    Chạy trong thread pool để không block event loop.
-    Trả về dict (aligned result).
-    """
     return await asyncio.to_thread(_transcribe_sync, audio_path)

@@ -4,13 +4,13 @@ KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
 KAFKA_GROUP_ID = "inventory-service-group"
 
 
-# src/kafka/config.py
+
 def create_kafka_producer() -> Producer:
     producer_config = {
         "bootstrap.servers": "localhost:9092",
-        "linger.ms": 5,  # Giảm latency
-        "batch.num.messages": 100, # Tăng throughput
-        "queue.buffering.max.ms": 50, # Tăng thời gian chờ để gom nhiều message hơn
+        "linger.ms": 5,  # Chờ tối đa 5ms để gom message
+        "batch.num.messages": 100, # Gửi tối đa 100 message mỗi lần
+        "queue.buffering.max.ms": 50, # Buffer tối đa 50ms
     }
     return Producer(producer_config)
 

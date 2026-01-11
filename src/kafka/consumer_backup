@@ -29,12 +29,11 @@ from src.utils.chunk_utils import chunk_list
 
 
 async def handleLessonGenerationRequested(event: LessonGenerationRequestedEvent):
-    """Xử lý khi có yêu cầu tạo bài học."""
     print(f"📥 Nhận LessonGenerationRequestedEvent: {event}")
-    audio_info = None  # cho finally nếu sau này dọn file
+    audio_info = None  # Để cuối cùng dọn file local
 
     try:
-        # Cho 2s cho hệ thống ổn định
+        # Cho hệ thống ổn định
         await asyncio.sleep(2)
 
         if await ai_job_service.aiJobWasCancelled(event.ai_job_id):
