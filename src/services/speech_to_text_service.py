@@ -5,32 +5,56 @@ import librosa
 import torch
 import whisperx
 
-from src import dto
 from src.errors.base_exception import BaseException
 from src.errors.base_error_code import BaseErrorCode
 
-# Device + ASR model
+# =========================
+# CONFIG
+# =========================
+ENABLE_WHISPERX = os.getenv("ENABLE_WHISPERX", "1") == "1"  # 1=bật, 0=tắt
+
 device = "cuda" if torch.cuda.is_available() else "cpu"
 compute_type = "float16" if device == "cuda" else "float32"
 
-print(f"[WhisperX] Loading ASR model (base.en) on {device} ({compute_type})...")
-with torch.no_grad():
-  whisper_model = whisperx.load_model(
-      "base.en",
-      device=device,
-      compute_type=compute_type,
-  )
-print("✅ [WhisperX] ASR model loaded successfully!")
+# Model sẽ chỉ load khi cần
+whisper_model = None
 
 # Align model cache (per language)
 _align_model_cache: dict[str, tuple[object, dict]] = {}
 
 
+# MODEL LOAD 
+def _ensure_whisper_model_loaded():
+    global whisper_model
+
+    if not ENABLE_WHISPERX:
+        raise BaseException(
+            BaseErrorCode.INVALID_REQUEST,
+            "WhisperX is disabled (set ENABLE_WHISPERX=1 to enable).",
+        )
+
+    if whisper_model is None:
+        print(f"[WhisperX] Loading ASR model (base.en) on {device} ({compute_type})...")
+        with torch.no_grad():
+            whisper_model = whisperx.load_model(
+                "base.en",
+                device=device,
+                compute_type=compute_type,
+            )
+        print("✅ [WhisperX] ASR model loaded successfully!")
+# UNLOAD MODEL
+def unload_whisperx():
+    global whisper_model
+    whisper_model = None
+    _align_model_cache.clear()
+
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.ipc_collect()
+
+
+# GET ALIGN MODEL (WITH CACHING)
 def _get_align_model(language_code: str) -> tuple[object, dict]:
-    """
-    Load align model theo language_code, nhưng chỉ load 1 lần rồi cache lại.
-    Điều này tránh việc mỗi lần transcribe lại load model mới → phình RAM.
-    """
     if not language_code:
         language_code = "en"
 
@@ -48,13 +72,11 @@ def _get_align_model(language_code: str) -> tuple[object, dict]:
     return align_model, metadata
 
 
-
+# UTILS
 def _get_audio_duration_sync(path: str) -> float:
     if not os.path.exists(path):
         raise BaseException(BaseErrorCode.NOT_FOUND, f"File not found: {path}")
     try:
-        # librosa.load đọc toàn bộ file vào RAM, nhưng chỉ để lấy duration.
-        # Nếu muốn tiết kiệm RAM hơn nữa, có thể dùng soundfile.info hoặc ffprobe sau này.
         y, sr = librosa.load(path, sr=None)
         return librosa.get_duration(y=y, sr=sr)
     except Exception:
@@ -65,11 +87,11 @@ def _get_audio_duration_sync(path: str) -> float:
 
 
 def _transcribe_sync(audio_path: str):
+    _ensure_whisper_model_loaded()
+
     with torch.no_grad():
-        # WhisperX transcription
         result = whisper_model.transcribe(audio_path, batch_size=4)
 
-        # WhisperX alignment (dùng model cache)
         language_code = result.get("language") or "en"
         align_model, metadata = _get_align_model(language_code)
 
@@ -81,7 +103,6 @@ def _transcribe_sync(audio_path: str):
             device,
         )
 
-    # Chỉ xóa đúng trường 'word_segments'
     if isinstance(aligned, dict):
         aligned.pop("word_segments", None)
 
@@ -89,7 +110,6 @@ def _transcribe_sync(audio_path: str):
 
 
 
-#  ASYNC WRAPPERS
 async def get_audio_duration(path: str) -> float:
     return await asyncio.to_thread(_get_audio_duration_sync, path)
 

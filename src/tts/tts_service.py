@@ -1,49 +1,42 @@
 import os
+import asyncio
 from google.cloud import texttospeech
 from .config import TTSConfig
 
 tts_config = TTSConfig()
 
-# Load GOOGLE_APPLICATION_CREDENTIALS từ .env
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 
-# Khởi tạo Google TTS Client
+cred = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+if not cred:
+    raise RuntimeError("GOOGLE_APPLICATION_CREDENTIALS chưa được set")
+if not os.path.exists(cred):
+    raise RuntimeError(f"Không thấy file credentials: {cred}")
+
 client = texttospeech.TextToSpeechClient()
 
-# Mapping giọng đọc
 VOICE_MAP = {
-    "uk": {
-        "language": "en-GB",
-        "voice": "en-GB-Wavenet-B"  # Giọng nam UK
-    },
-    "us": {
-        "language": "en-US",
-        "voice": "en-US-Wavenet-A"  # Giọng nữ US
-    }
+    "uk": {"language": "en-GB", "voice": "en-GB-Wavenet-A"},
+    "us": {"language": "en-US", "voice": "en-US-Wavenet-B"},
 }
 
-def synthesize_text(text: str, voice_key: str) -> bytes:
-    """
-    Chuyển văn bản thành giọng nói.
-    voice_key: "us" | "uk"
-    """
+def _synthesize__text_sync(text: str, voice_key: str) -> bytes:
+    key = voice_key if voice_key in VOICE_MAP else tts_config.default_voice
+    if key not in VOICE_MAP:
+        key = "us"
 
-    selected = VOICE_MAP.get(voice_key, VOICE_MAP[tts_config.default_voice])
+    selected = VOICE_MAP[key]
 
     synthesis_input = texttospeech.SynthesisInput(text=text)
 
-    # chọn giọng
     voice = texttospeech.VoiceSelectionParams(
         language_code=selected["language"],
         name=selected["voice"]
     )
 
-    # định dạng âm thanh
     audio_config = texttospeech.AudioConfig(
         audio_encoding=texttospeech.AudioEncoding.MP3
     )
 
-    # gọi Google API
     response = client.synthesize_speech(
         input=synthesis_input,
         voice=voice,
@@ -51,3 +44,7 @@ def synthesize_text(text: str, voice_key: str) -> bytes:
     )
 
     return response.audio_content
+
+async def synthesize_text(text: str, voice_key: str) -> bytes:
+    # để async thật sự (không block), chạy sync code trong thread
+    return await asyncio.to_thread(_synthesize__text_sync, text, voice_key)

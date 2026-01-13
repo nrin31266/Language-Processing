@@ -3,8 +3,10 @@ import re
 import json
 from typing import Any, List, Dict
 
+
 from src.gemini.gemini_service import gemini_generate
 from src.gemini.prompt_sentence_batch import SENTENCE_PROMPT_TEMPLATE
+from src.gemini.prompt_word_analysis_batch import WORD_PROMPT_TEMPLATE
 
 
 async def analyze_sentence_batch(sentences_chunk: List[Dict[str, Any]]):
@@ -21,14 +23,21 @@ async def analyze_sentence_batch(sentences_chunk: List[Dict[str, Any]]):
         raise ValueError(f"Gemini response must be a JSON array: {resp}")
 
     return resp
+async def analyze_word(word: str):
+    prompt = WORD_PROMPT_TEMPLATE.substitute(word=word)
+    resp = await gemini_generate(prompt)
+    if not isinstance(resp, dict):
+        raise ValueError(f"Gemini response must be a JSON object: {resp}")
+    return resp
+    
 
 
-def clean_json(text: str) -> str:
-    """Remove Markdown ```json ... ``` wrapper."""
-    text = re.sub(r"^```json", "", text.strip())
-    text = re.sub(r"^```", "", text)
-    text = re.sub(r"```$", "", text)
-    return text.strip()
+# def clean_json(text: str) -> str:
+#     """Remove Markdown ```json ... ``` wrapper."""
+#     text = re.sub(r"^```json", "", text.strip())
+#     text = re.sub(r"^```", "", text)
+#     text = re.sub(r"```$", "", text)
+#     return text.strip()
 
 
 
@@ -42,6 +51,7 @@ def clean_json(text: str) -> str:
 
 # {
 #   "word": "$word",
+#    "originWord": "",
 #   "isValidWord": true,
 #   "wordType": "normal | proper_noun | brand | abbreviation | symbol | filler | nonsense",
 #   "cefrLevel": "A1 | A2 | B1 | B2 | C1 | C2 | unknown",

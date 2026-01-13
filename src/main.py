@@ -28,7 +28,7 @@ logging.basicConfig(
 import gc
 import torch
 from src.redis.redis_client import redis_client
-
+from src.services.word_analysis_service import start_if_enabled_env
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # --- Khi app START ---
@@ -49,6 +49,10 @@ async def lifespan(app: FastAPI):
     flush_task = asyncio.create_task(periodic_flush())  # Thêm periodic flush
     
     print("✅ Kafka consumers started")
+    
+    # start worker if env enabled
+    await start_if_enabled_env()
+    
     yield  
 
      # Khi app SHUTDOWN 
@@ -65,7 +69,8 @@ async def lifespan(app: FastAPI):
     
     #  DỌN CLEANUP WHISPERX + PYTORCH GPU
     print("Cleaning WhisperX & GPU memory...")
-    from src.services.speech_to_text_service import whisper_model
+    import src.services.speech_to_text_service as stt_service
+    stt_service.unload_whisperx()
 
     try:
         del whisper_model

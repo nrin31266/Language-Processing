@@ -1,6 +1,6 @@
 from typing import Generic, TypeVar, Optional, Any, Dict, List
 from pydantic import BaseModel, Field
-from pydantic.generics import GenericModel  # 👈 THÊM DÒNG NÀY
+from pydantic.generics import GenericModel  # THÊM DÒNG NÀY
 from datetime import datetime as DateTime
 from typing import Literal
 from src.enum   import LessonProcessingStep
@@ -55,7 +55,7 @@ class TranscriptionResponse(BaseModel):
     segments: List[TranscriptionSegment]
     full_text: str
     created_at: DateTime = None
-    shadowingResult: ShadowingResult | None = None  # 👈 thêm
+    shadowingResult: ShadowingResult | None = None  #  thêm
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -64,7 +64,7 @@ class TranscriptionResponse(BaseModel):
 class TranscribeUrlRequest(BaseModel):
     audio_url: str
 
-class ApiResponse(GenericModel, Generic[T]):  # → GenericModel
+class ApiResponse(GenericModel, Generic[T]):  # GenericModel
     """
     Một lớp response chung cho API.
     """
@@ -160,3 +160,40 @@ class LessonGenerationAiMetadataDto(BaseModel):
     class Config:
         from_attributes = True
 
+class PhoneticsDto(BaseModel):
+    us: str = ""
+    uk: str = ""
+    audioUs: Optional[str] = None
+    audioUk: Optional[str] = None
+    
+
+    class Config:
+        from_attributes = True
+
+
+class DefinitionDto(BaseModel):
+    type: str = ""
+    definition: str = ""
+    vietnamese: str = ""
+    example: str = ""
+
+    class Config:
+        from_attributes = True
+
+
+class WordAnalyzedDto(BaseModel):
+    word: str
+    displayWord: str = ""
+    isValidWord: bool = True
+
+    # đổi sang string (không fix cứng)
+    wordType: str = "normal"
+    cefrLevel: str = "unknown"
+
+    phonetics: PhoneticsDto = Field(default_factory=PhoneticsDto)
+    definitions: List[DefinitionDto] = Field(default_factory=list)
+
+    
+    
+    class Config:
+        from_attributes = True
