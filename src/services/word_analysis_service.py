@@ -7,6 +7,8 @@ from src.services.batch_service import analyze_word
 from src.dto import WordAnalyzedDto
 from src.s3_storage.cloud_service import upload_file
 from src.tts.tts_service import synthesize_text
+from src.kafka.event import WordAnalyzedEvent, WordQueueHandlerEvent
+from src.kafka.producer import publish_word_analyzed, publish_word_queue_handler
 QUEUE = "queue:vocab"
 PROC = "processing:vocab"
 ENABLE = "enable_vocab_queue"
@@ -21,7 +23,7 @@ def log(msg: str):
 
 async def enabled() -> bool:
     v = await redis.get(ENABLE)
-    return (v is None) or (v == "1")
+    return v == "true"
 
 async def worker_loop():
     log("Worker loop started")
@@ -47,7 +49,11 @@ async def worker_loop():
             await asyncio.sleep(PAUSE_SLEEP)
             continue
 
+        log(f"Processing word: {word}")
         start_time = time.time()
+        # publish "start processing" event
+        await publish_word_queue_handler(WordQueueHandlerEvent(word=word))
+        
         try:
             result = await analyze_word(word)   # result là dict hoặc object
             data = WordAnalyzedDto.model_validate(result)
@@ -66,8 +72,11 @@ async def worker_loop():
                 # attach audio urls
                 data.phonetics.audioUs = url_us
                 data.phonetics.audioUk = url_uk
-            # TODO: gửi backend lưu data
-            log(f"Final data for word {word}: {data}")
+            # publish event
+            event = WordAnalyzedEvent.model_validate(data)
+            log(f"Analyzed word: {event.model_dump_json(by_alias=True)}")
+            await publish_word_analyzed(event)
+            print(f"[Kafka] Published word analyzed event for: {word}")
         except Exception as e:
             log(f"Error: {word} -> {e}")
         finally:

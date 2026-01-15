@@ -2,8 +2,8 @@ import json
 from src.kafka.config import create_kafka_producer
 
 from src.kafka.config import create_kafka_producer
-from src.kafka.event import LessonProcessingStepUpdatedEvent
-from src.kafka.topic import LESSON_PROCESSING_STEP_UPDATED_TOPIC
+from src.kafka.event import LessonProcessingStepUpdatedEvent, WordAnalyzedEvent, WordQueueHandlerEvent
+from src.kafka.topic import LESSON_PROCESSING_STEP_UPDATED_TOPIC, WORD_ANALYZED_TOPIC, WORD_QUEUE_HANDLER_TOPIC
 import asyncio
 
 producer = create_kafka_producer()
@@ -11,6 +11,22 @@ async def publish_lesson_processing_step_updated(event: LessonProcessingStepUpda
     producer.produce(
         topic=LESSON_PROCESSING_STEP_UPDATED_TOPIC,
         key=str(event.ai_job_id),
+        value=event.model_dump_json(by_alias=True),
+    )
+    await asyncio.to_thread(producer.poll, 0)
+    
+async def publish_word_analyzed(event: WordAnalyzedEvent) -> None:
+    producer.produce(
+        topic=WORD_ANALYZED_TOPIC,
+        key=event.word,
+        value=event.model_dump_json(by_alias=True),
+    )
+    await asyncio.to_thread(producer.poll, 0)
+async def publish_word_queue_handler(event: WordQueueHandlerEvent) -> None:
+    # Start processing new word in the queue
+    producer.produce(
+        topic=WORD_QUEUE_HANDLER_TOPIC,
+        key=event.word,
         value=event.model_dump_json(by_alias=True),
     )
     await asyncio.to_thread(producer.poll, 0)
