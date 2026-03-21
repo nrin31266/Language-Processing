@@ -14,7 +14,6 @@ security = HTTPBearer()
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> auth_dto.UserPrincipal:
-    """Dependency để lấy thông tin user hiện tại"""
     try:
         logger.info("get_current_user dependency called")
         
@@ -47,7 +46,7 @@ async def get_current_user(
         )
 
 def require_roles(required_roles: list[str]):
-    """Factory function cho role-based authorization"""
+    
     def role_checker(current_user: auth_dto.UserPrincipal = Depends(get_current_user)):
         logger.info(f"Checking roles: user has {current_user.roles}, required {required_roles}")
         

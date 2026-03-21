@@ -1,8 +1,5 @@
 from confluent_kafka import Producer, Consumer
 
-KAFKA_BOOTSTRAP_SERVERS = "localhost:9092"
-KAFKA_GROUP_ID = "inventory-service-group"
-
 
 
 def create_kafka_producer() -> Producer:

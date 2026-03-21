@@ -14,17 +14,12 @@ model = genai.GenerativeModel(
         "temperature": 0,
         "response_mime_type": "application/json",
     },
-    system_instruction="Respond with valid JSON only. No markdown. No extra text.",
+    system_instruction="You are a helpful assistant for text processing tasks. Always respond in JSON format according to the user's request.",
 )
 
 
 async def gemini_generate(prompt: str):
-    """
-    Async wrapper cho Gemini.
-    Chạy generate_content ở thread pool để không block event loop,
-    sau đó parse JSON và trả về dict.
-    """
-    # sync → đưa sang thread khác
+    
     response = await asyncio.to_thread(model.generate_content, prompt)
 
     # response.text là chuỗi JSON (theo response_mime_type)

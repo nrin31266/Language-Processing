@@ -13,7 +13,6 @@ _jwks = None
 
 def get_jwks():
     
-    """Lấy JWKS từ Keycloak"""
     global _jwks
     if _jwks is None:
         jwks_uri = f"{keycloak_config.issuer_uri}/protocol/openid-connect/certs"
@@ -25,7 +24,6 @@ def get_jwks():
     return _jwks
 
 def get_signing_key(kid):
-    """Lấy signing key từ JWKS bằng kid"""
     jwks = get_jwks()
     for key in jwks['keys']:
         if key['kid'] == kid:
@@ -38,7 +36,6 @@ def get_signing_key(kid):
     )
 
 def decode_token(token: str) -> dict:
-    """Giải mã và xác thực token"""
     try:
         logger.info(f"Starting token decoding for token: {token[:50]}...")
         
@@ -71,8 +68,7 @@ def decode_token(token: str) -> dict:
             issuer=keycloak_config.issuer_uri
         )
         
-        logger.info("Token decoded successfully")
-        logger.info(f"Token content keys: {list(decoded_token.keys())}")
+        logger.info("Token decoded successfully with claims: " + ", ".join(decoded_token.keys()))
         
         return decoded_token
         
@@ -90,22 +86,17 @@ def decode_token(token: str) -> dict:
         )
 
 def extract_user_principal(token: str) -> auth_dto.UserPrincipal:
-    """Trích xuất thông tin user từ token - kết hợp cả realm và client roles"""
     try:
         logger.info("Extracting user principal from token")
         decoded_token = decode_token(token)
         
-        # Log để debug
-        logger.info(f"Available token claims: {list(decoded_token.keys())}")
-        logger.info(f"Resource access: {decoded_token.get('resource_access')}")
-        logger.info(f"Realm access: {decoded_token.get('realm_access')}")
         
-        # LẤY REALM ROLES (tương đương JwtGrantedAuthoritiesConverter trong Java)
+        # LẤY REALM ROLES 
         realm_access = decoded_token.get('realm_access', {})
         realm_roles = realm_access.get('roles', [])
         logger.info(f"Found realm roles: {realm_roles}")
         
-        # LẤY CLIENT ROLES (giống hệt Java code của bạn)
+        # LẤY CLIENT ROLES 
         resource_access = decoded_token.get('resource_access', {})
         logger.info(f"Available clients in resource_access: {list(resource_access.keys())}")
         
@@ -113,11 +104,11 @@ def extract_user_principal(token: str) -> auth_dto.UserPrincipal:
         client_roles = account_access.get('roles', [])
         logger.info(f"Found client roles from account: {client_roles}")
         
-        # KẾT HỢP CẢ HAI LOẠI ROLES (giống Stream.concat trong Java)
+        # KẾT HỢP CẢ HAI LOẠI ROLES 
         all_roles = realm_roles + client_roles
         logger.info(f"All combined roles: {all_roles}")
         
-        # Format roles: ROLE_XXX_XXX (giống hệt Java)
+        # Format roles: ROLE_XXX_XXX 
         formatted_roles = [
             f"ROLE_{role.replace('-', '_').upper()}" 
             for role in all_roles

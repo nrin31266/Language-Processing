@@ -6,5 +6,5 @@ redis_config = RedisConfig()
 redis_client = from_url(
     redis_config.url,
     decode_responses=True,
-    # ssl=True  
+   # ssl=False
 )
