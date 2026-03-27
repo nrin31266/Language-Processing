@@ -160,40 +160,8 @@ class LessonGenerationAiMetadataDto(BaseModel):
     class Config:
         from_attributes = True
 
-class PhoneticsDto(BaseModel):
-    us: str = ""
-    uk: str = ""
-    audioUs: Optional[str] = None
-    audioUk: Optional[str] = None
+
     
-
-    class Config:
-        from_attributes = True
-
-
-class DefinitionDto(BaseModel):
-    type: str = ""
-    definition: str = ""
-    vietnamese: str = ""
-    example: str = ""
-
-    class Config:
-        from_attributes = True
-
-
-class WordAnalyzedDto(BaseModel):
+class SpaCyWordAnalysisRequest(BaseModel):
     word: str
-    displayWord: str = ""
-    isValidWord: bool = True
-
-    # đổi sang string (không fix cứng)
-    wordType: str = "normal"
-    cefrLevel: str = "unknown"
-
-    phonetics: PhoneticsDto = Field(default_factory=PhoneticsDto)
-    definitions: List[DefinitionDto] = Field(default_factory=list)
-
-    
-    
-    class Config:
-        from_attributes = True
+    context: str | None = None

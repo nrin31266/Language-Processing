@@ -18,7 +18,7 @@ from src.kafka.consumer.consumer import start_kafka_consumers
 from src.kafka.producer import periodic_flush, producer
 from src.s3_storage.config import setup_cloudinary
 from src.redis.redis_client import redis_client
-from src.routers import tts_router, dictionary_router, ai_job_router, speech_to_text_router
+from src.routers import spaCy_router, tts_router, ai_job_router, speech_to_text_router
 
 # LOGGING CONFIG
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(name)s | %(message)s")
@@ -100,7 +100,7 @@ app.add_middleware(
 app.include_router(speech_to_text_router.router)
 app.include_router(ai_job_router.router)
 app.include_router(tts_router.router)
-app.include_router(dictionary_router.router)
+app.include_router(spaCy_router.router)
 
 # EXCEPTION HANDLERS
 app.add_exception_handler(HTTPException, http_exception_handler)
