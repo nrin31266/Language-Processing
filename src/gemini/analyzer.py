@@ -31,23 +31,20 @@ async def analyze_sentence_batch(sentences_chunk: List[Dict[str, Any]]):
 
 
 async def analyze_word(word: str, pos: str, context: str) -> dict:
-    """Gọi AI phân tích 1 từ, trả về dict đúng format SuccessRequest"""
-
     prompt = WORD_ANALYSIS_PROMPT_TEMPLATE.substitute(
         word=word,
         pos=pos,
         context=context
     )
 
-    resp = await gemini_generate(prompt)  # đã đảm bảo trả về dict
+    resp = await gemini_generate(prompt)
 
-    # --- validate tối thiểu ---
-    required_fields = ["isValid", "summaryVi", "phonetics", "definitions"]
+    # --- validate ---
+    required_fields = ["isValid", "summaryVi", "phonetics", "definitions", "cefrLevel"]
     for field in required_fields:
         if field not in resp:
             raise ValueError(f"Missing field: {field}")
 
-    # --- validate kiểu dữ liệu quan trọng ---
     if not isinstance(resp["isValid"], bool):
         raise ValueError("isValid must be boolean")
 
@@ -57,5 +54,16 @@ async def analyze_word(word: str, pos: str, context: str) -> dict:
     if not isinstance(resp["phonetics"], dict):
         raise ValueError("phonetics must be an object")
 
-    logger.info(f"[ANALYZE] {word}_{pos} | isValid: {resp['isValid']} | definitions: {len(resp['definitions'])} | phonetics: {resp['phonetics']}")
+    # 🔥 validate CEFR
+    valid_cefr = {"A1", "A2", "B1", "B2", "C1", "C2"}
+    if resp["cefrLevel"] not in valid_cefr:
+        raise ValueError(f"Invalid CEFR level: {resp['cefrLevel']}")
+
+    logger.info(
+        f"[ANALYZE] {word}_{pos} | "
+        f"isValid: {resp['isValid']} | "
+        f"cefr: {resp['cefrLevel']} | "
+        f"definitions: {len(resp['definitions'])}"
+    )
+
     return resp

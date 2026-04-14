@@ -81,7 +81,8 @@ OUTPUT FORMAT:
       "example": ""
     }
   ],
-  "isValid": true
+  "isValid": true,
+  "cefrLevel": ""
 }
 
 RULES:
@@ -93,17 +94,23 @@ RULES:
   - not a real English word
 - DO NOT mark false just because POS does not match context
 
-2) summaryVi:
+2) cefrLevel:
+- MUST be one of: A1, A2, B1, B2, C1, C2
+- Based on common CEFR classification of the word
+- If unsure → choose the closest level
+- DO NOT leave empty
+
+3) summaryVi:
 - VERY SHORT Vietnamese meanings
 - separated by "," or "/"
 - NO full sentence
 
-3) phonetics:
+4) phonetics:
 - Provide BOTH UK and US IPA
 - Based on correct POS
 - audioUrl MUST be "" (do NOT invent URLs)
 
-4) definitions:
+5) definitions:
 - MUST return as MANY definitions as possible (up to 3)
 - Prefer 2–3 definitions whenever possible
 - Returning only 1 definition when multiple meanings exist is NOT preferred
@@ -113,10 +120,10 @@ RULES:
   - FIRST definition MUST match context
   - MUST use correct POS
 
-5) context usage:
+6) context usage:
 - MUST use context to choose correct meaning
 
-6) DO NOT:
+7) DO NOT:
 - add extra fields
 - return null
 - generate long explanations
