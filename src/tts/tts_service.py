@@ -1,40 +1,44 @@
-import os
 import asyncio
+import logging
 from google.cloud import texttospeech
-from .config import TTSConfig
+from typing import Optional, Tuple
+import xml.sax.saxutils as saxutils
 
-tts_config = TTSConfig()
-
-
-cred = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-if not cred:
-    raise RuntimeError("GOOGLE_APPLICATION_CREDENTIALS chưa được set")
-if not os.path.exists(cred):
-    raise RuntimeError(f"Không thấy file credentials: {cred}")
-
-client = texttospeech.TextToSpeechClient()
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 VOICE_MAP = {
-    "uk": {"language": "en-GB", "voice": "en-GB-Wavenet-A"},
-    "us": {"language": "en-US", "voice": "en-US-Wavenet-B"},
+    "uk": {
+        "language": "en-GB",
+        "voice": "en-GB-Wavenet-B" # giọng nam
+    },
+    "us": {
+        "language": "en-US",
+        "voice": "en-US-Wavenet-E" # giọng nữ
+    },
 }
 
-def _synthesize__text_sync(text: str, voice_key: str) -> bytes:
-    key = voice_key if voice_key in VOICE_MAP else tts_config.default_voice
-    if key not in VOICE_MAP:
-        key = "us"
 
-    selected = VOICE_MAP[key]
+# --- SYNC CORE ---
+def _synthesize_sync(ssml_text: str, voice_key: str) -> bytes:
+    selected = VOICE_MAP.get(voice_key, VOICE_MAP["us"])
 
-    synthesis_input = texttospeech.SynthesisInput(text=text)
+    logger.info(f"[TTS-{voice_key.upper()}] Voice: {selected['voice']}")
+
+    client = texttospeech.TextToSpeechClient()
+
+    synthesis_input = texttospeech.SynthesisInput(ssml=ssml_text)
 
     voice = texttospeech.VoiceSelectionParams(
         language_code=selected["language"],
         name=selected["voice"]
     )
 
+    # 🔥 đọc chậm ở đây (KHÔNG dùng prosody nữa)
     audio_config = texttospeech.AudioConfig(
-        audio_encoding=texttospeech.AudioEncoding.MP3
+        audio_encoding=texttospeech.AudioEncoding.MP3,
+        speaking_rate=0.9,
+        pitch=0.0
     )
 
     response = client.synthesize_speech(
@@ -43,8 +47,60 @@ def _synthesize__text_sync(text: str, voice_key: str) -> bytes:
         audio_config=audio_config
     )
 
+    size = len(response.audio_content)
+    logger.info(f"[TTS-{voice_key.upper()}] Done - Size: {size} bytes")
+
+    # ⚠️ detect audio lỗi (rất hay)
+    if size < 3000:
+        logger.warning(f"[TTS-{voice_key.upper()}] Suspicious small audio!")
+
     return response.audio_content
 
-async def synthesize_text(text: str, voice_key: str) -> bytes:
-    # để async thật sự (không block), chạy sync code trong thread
-    return await asyncio.to_thread(_synthesize__text_sync, text, voice_key)
+
+# --- ASYNC WRAPPER ---
+async def _synthesize_ssml(ssml_text: str, voice_key: str) -> bytes:
+    return await asyncio.to_thread(_synthesize_sync, ssml_text, voice_key)
+
+
+# --- SSML BUILDER ---
+# Problem: UK chưa thể tuân thủ IPA
+def build_ssml(word: str, ipa: Optional[str]) -> str:
+    if not ipa:
+        safe_word = saxutils.escape(word)
+        return f"<speak>{safe_word}</speak>"
+
+    clean_ipa = ipa.strip().strip('/').strip('[').strip(']')
+    safe_ipa = saxutils.escape(clean_ipa)
+    
+        
+    safe_word = saxutils.escape(word)
+
+    logger.info(f"[TTS] IPA: {safe_ipa} | Word-Hack: {safe_word}")
+
+    return (
+        f'<speak>'
+        f'<break time="10ms"/>' # Nghỉ cực ngắn để ổn định engine
+        f'<phoneme alphabet="ipa" ph="{safe_ipa}">{safe_word}</phoneme>'
+        f'</speak>'
+    )
+
+# --- MAIN API ---
+async def generate_audio(
+    ipa_us: Optional[str],
+    ipa_uk: Optional[str],
+    word: str
+) -> Tuple[bytes, bytes]:
+
+    logger.info(f"[TTS] Generate: {word}")
+
+    us_ssml = build_ssml(word, ipa_us)
+    uk_ssml = build_ssml(word, ipa_uk)
+
+    uk_task = _synthesize_ssml(uk_ssml, "uk")
+    us_task = _synthesize_ssml(us_ssml, "us")
+
+    uk_audio, us_audio = await asyncio.gather(uk_task, us_task)
+
+    logger.info(f"[TTS] Done: {word}")
+
+    return uk_audio, us_audio

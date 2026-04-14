@@ -6,10 +6,11 @@ from src import dto
 from src.enum import LessonProcessingStep, LessonSourceType
 from src.kafka.event import LessonGenerationRequestedEvent, LessonProcessingStepUpdatedEvent
 from src.kafka.producer import publish_lesson_processing_step_updated
-from src.services import media_service, ai_job_service, speech_to_text_service, batch_service
+from src.services import media_service, ai_job_service, speech_to_text_service
 from src.services.file_service import fetch_json_from_url, file_exists
 from src.s3_storage import cloud_service
 from src.utils.chunk_utils import chunk_list
+from src.gemini import analyzer
 
 
 async def _is_cancelled(ai_job_id: str | None) -> bool:
@@ -171,7 +172,7 @@ async def handle_lesson_generation_requested(event: LessonGenerationRequestedEve
                     return
 
                 wave = chunks[i:i + MAX_CONCURRENCY]
-                results = await asyncio.gather(*[batch_service.analyze_sentence_batch(chunk) for chunk in wave], return_exceptions=True)
+                results = await asyncio.gather(*[analyzer.analyze_sentence_batch(chunk) for chunk in wave], return_exceptions=True)
 
                 for chunk, result in zip(wave, results):
                     if isinstance(result, Exception):

@@ -1,4 +1,3 @@
-import json
 from src.kafka.config import create_kafka_producer
 
 from src.kafka.config import create_kafka_producer
