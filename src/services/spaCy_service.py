@@ -16,7 +16,7 @@ def _ensure_spacy_model_loaded():
     global _spacy_model
 
     if _spacy_model is None:
-        print(f"[spaCy] Loading model '{SPACY_MODEL_NAME}'...")
+        print(f"[spaCy] Loading model ' {SPACY_MODEL_NAME}'...")
         _spacy_model = spacy.load(SPACY_MODEL_NAME)
         print("✅ [spaCy] Model loaded successfully!")
 
